@@ -7,7 +7,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #173f2f url('/assets/mahjong-backplate.png') center center / cover no-repeat;
+  background: #173f2f var(--backplate-image, none) center center / cover no-repeat;
 }
 body::after {
   content: '';
