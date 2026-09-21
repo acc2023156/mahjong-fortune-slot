@@ -1,0 +1,482 @@
+.feature-entry{position:absolute;z-index:12;left:22px;bottom:22px;width:58px;height:58px;border:2px solid #ffe172;border-radius:13px;background:linear-gradient(145deg,#31313a,#111116);color:#ffd000;font-size:28px;cursor:pointer;box-shadow:0 7px 22px #0009}.feature-entry:hover{transform:translateY(-2px)}
+.feature-modal{position:fixed;z-index:40;inset:0;display:none;align-items:center;justify-content:center;padding:8vh 10vw;background:#02070bb8}.feature-modal.open{display:flex}.feature-dialog{width:min(1030px,80vw);height:min(720px,82vh);border:2px solid #696a73;border-radius:14px;background:#17171b;box-shadow:0 25px 80px #000c;overflow:hidden;position:relative}.feature-close{position:absolute;z-index:3;right:14px;top:10px;width:32px;height:32px;border:1px solid #888;border-radius:50%;background:transparent;color:#bbb;font-size:22px;cursor:pointer}.feature-title{height:54px;margin:0;display:grid;place-items:center;background:#18181b;font-size:21px}.feature-nav{height:60px;display:flex;align-items:end;justify-content:center;background:#29292c}.feature-tab{width:52px;height:47px;border:0;border-bottom:2px solid #72727a;background:transparent;color:#8d8d96;font-size:25px;cursor:pointer}.feature-tab.active{color:#ffca00;border-bottom-color:#ffca00}.feature-pages{height:calc(100% - 114px);overflow:auto;scrollbar-width:none}.feature-pages::-webkit-scrollbar{display:none}.feature-page{display:none;min-height:100%;padding:22px 8%;text-align:center}.feature-page.active{display:block}
+.bet-stepper{display:grid;grid-template-columns:48px 124px 48px;width:max-content;margin:0 auto 60px;border:2px solid #9a9aa4;border-radius:10px;overflow:hidden}.bet-stepper button{border:0;background:#17171b;color:#ddd;font-size:27px}.bet-stepper strong{padding:10px;background:#fff;color:#101014;font-size:20px}.buy-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:34px}.buy-card{position:relative;background:#fff;color:#15151a;border-radius:10px;min-height:230px;padding:53px 17px 38px}.buy-art{position:absolute;top:-42px;left:50%;transform:translateX(-50%);font-size:58px}.buy-card h3{font-size:17px;margin:8px}.buy-card strong{display:block;font-size:20px;margin:10px}.buy-card em{font-size:12px}.buy-action{position:absolute;left:0;right:0;bottom:0;padding:9px;background:#aaaab3;color:#fff;font-size:14px;font-weight:800}.coming{min-height:370px;display:grid;place-items:center;color:#aaa;font-size:18px}.coming span{display:block;font-size:80px;margin-bottom:10px}
+.coupon-box{max-width:640px;margin:8px auto;border:2px solid #ffd200;border-radius:11px;padding:24px 55px;background:#29292d}.coupon-icon{font-size:58px}.coupon-box input{display:block;width:100%;margin:22px 0 35px;padding:12px;border:2px solid #777985;border-radius:7px;background:transparent;color:#fff}.redeem{width:190px;padding:10px;border:0;border-radius:5px;background:#64646d;font-weight:800}.coupon-foot{margin-top:25px;padding-top:20px;border-top:1px solid #594a19;color:#e6ce96;font-weight:700;font-size:16px}.rank-filters{max-width:430px;margin:0 auto 18px;display:grid;grid-template-columns:1fr 1fr;border-radius:8px;overflow:hidden}.rank-filters button{border:0;padding:10px;background:#29292d;color:#aaa;font-weight:700}.rank-filters .active{background:#ffca00;color:#111}.rank-table{width:100%;border-collapse:collapse;text-align:left;font-size:13px}.rank-table th{padding:9px;background:#332f1d;color:#ffe000}.rank-table td{padding:9px;border-bottom:1px solid #555;background:#29292d}.rank-table tr:nth-child(even) td{background:#19191d}.rank-num{color:#ffca00;font-weight:900}
+.vip-wrap{max-width:430px;margin:0 auto;background:#050505;border-radius:16px;padding:14px;text-align:left;font-size:13px}.vip-head{display:grid;grid-template-columns:1fr 1fr;text-align:center}.vip-head span{padding:8px}.vip-head .active{background:#063a3a;border-radius:10px;font-weight:800}.vip-card{margin:10px 32px;padding:18px;border:1px solid #888;border-radius:6px;background:linear-gradient(145deg,#3b3b3b,#111);min-height:145px}.vip-badge{font-size:45px}.vip-wrap h3{padding-left:34px;margin:10px 0}.vip-list{list-style:none;line-height:1.65;padding:0 34px;margin:8px 0}.vip-list li:before{content:'✓';margin-right:12px;color:#aaa}.vip-months{text-align:center;margin:12px 0;word-spacing:15px}.vip-bottom{display:grid;grid-template-columns:repeat(4,1fr);text-align:center;border-top:1px solid #333}.vip-bottom span{padding:9px 3px}.vip-bottom .active{color:#ffd000;background:#322a00}
+.reward-page{padding:16px 5%}.reward-head{display:flex;justify-content:space-between;align-items:center;padding:0 4px 14px;border-bottom:1px solid #555;color:#ddd}.reward-head strong{color:#d9b900}.reward-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:18px}.reward-ticket{position:relative;min-height:155px;border:1px solid #393939;border-radius:4px;background:#101014;color:#eee;padding:12px 8px 38px;cursor:pointer}.reward-ticket .ticket-art{display:grid;place-items:center;width:72px;height:50px;margin:0 auto 4px;transform:rotate(-6deg);background:linear-gradient(#fff18b,#ff8b00);color:#fff;font-size:18px;font-weight:1000;line-height:.82;text-shadow:1px 2px #7d3800;border:2px solid #fff}.reward-ticket strong{display:block;font-size:13px;line-height:1.15;margin-top:5px}.reward-ticket em{position:absolute;left:7px;right:7px;bottom:7px;padding:6px;background:#4b4021;color:#e3c346;font-style:normal;font-weight:800}.reward-ticket.locked{filter:brightness(.35);cursor:not-allowed}.reward-ticket.locked>span:first-child{position:absolute;left:7px;top:6px;font-size:19px;z-index:1}.reward-ticket.available{border-color:#5c5c5c}.reward-ticket.available b{position:absolute;left:15px;top:55px;color:#ff7950}
+.lucky-entry{position:absolute;z-index:12;right:20px;bottom:22px;border:2px solid #ffe172;border-radius:13px;background:linear-gradient(145deg,#332800,#111);color:#ffd000;padding:8px 12px;font-size:10px;font-weight:900;cursor:pointer;box-shadow:0 7px 22px #0009}.lucky-entry span{display:block;font-size:24px}.lucky-entry:hover{transform:translateY(-2px)}.lucky-modal{position:fixed;z-index:45;inset:0;display:none;align-items:center;justify-content:center;background:#02070bc4;padding:6vh}.lucky-modal.open{display:flex}.lucky-dialog{position:relative;width:min(470px,92vw);height:min(790px,90vh);border-radius:20px;background:#030303;color:#ddd;overflow:hidden;box-shadow:0 25px 80px #000}.lucky-close{position:absolute;z-index:4;right:14px;top:14px;border:0;background:transparent;color:#bbb;font-size:34px;cursor:pointer}.lucky-head{height:70px;display:flex;justify-content:space-between;align-items:center;padding:0 75px 0 34px;color:#d5b924;font-size:13px}.wheel-stage{height:620px;display:grid;place-items:center;align-content:center;position:relative}.wheel-pointer{position:absolute;z-index:3;top:56px;color:#ffc648;font-size:55px;filter:drop-shadow(0 3px #7b2200)}.lucky-wheel{position:relative;width:390px;height:390px;border:15px solid #59085f;border-radius:50%;background:repeating-conic-gradient(from -11.25deg,#3b0048 0 22.5deg,#62006d 22.5deg 45deg);box-shadow:0 0 0 5px #ab178f,0 0 28px #ff00e6;transition:transform 3.5s cubic-bezier(.12,.75,.14,1)}.lucky-wheel:before{content:"";position:absolute;inset:12px;border:3px solid #b32ad0;border-radius:50%;box-shadow:inset 0 0 20px #000}.wheel-spin{position:absolute;z-index:2;left:50%;top:50%;transform:translate(-50%,-50%);width:105px;height:105px;border:8px solid #ffb62d;border-radius:50%;background:radial-gradient(circle,#ff6040,#b91422);color:#fff96c;font-size:25px;font-weight:1000;cursor:pointer;box-shadow:0 0 15px #ffcf22}.wheel-label{position:absolute;left:50%;top:50%;width:70px;margin-left:-35px;text-align:center;font-size:13px;transform-origin:35px 0}.l1{transform:rotate(0deg) translateY(-150px)}.l2{transform:rotate(45deg) translateY(-150px)}.l3{transform:rotate(90deg) translateY(-150px);color:#fff500}.l4{transform:rotate(135deg) translateY(-150px)}.l5{transform:rotate(180deg) translateY(-150px)}.l6{transform:rotate(225deg) translateY(-150px)}.l7{transform:rotate(270deg) translateY(-150px)}.l8{transform:rotate(315deg) translateY(-150px)}.wheel-result{min-height:22px;margin:22px 0 0;color:#f0cd3b;font-weight:800}.lucky-toolbar{position:absolute;left:0;right:0;bottom:0;height:96px;display:grid;grid-template-columns:repeat(4,1fr);background:#060606}.lucky-toolbar button{border:0;background:transparent;color:#aaa;font-weight:800;line-height:1.5}.lucky-toolbar .active{color:#d7b72b;background:linear-gradient(#483c08,#151000)}
+.integrated-wheel{position:relative;padding:14px 25%}.integrated-ticket{position:absolute;left:3%;top:44%;width:19%;display:grid;gap:8px;padding:12px;border:1px solid #5b5125;border-radius:8px;color:#d7bd31;font-size:11px;text-align:left}.integrated-ticket span{color:#fff;font-size:18px}.integrated-wheel .wheel-stage{height:500px}.integrated-wheel .wheel-pointer{top:25px;font-size:40px}.integrated-wheel .lucky-wheel{width:300px;height:300px;border-width:11px}.integrated-wheel .wheel-spin{width:70px;height:70px;border-width:5px;font-size:17px}.integrated-wheel .wheel-label{font-size:10px}.integrated-wheel .l1{transform:rotate(0deg) translateY(-112px)}.integrated-wheel .l2{transform:rotate(45deg) translateY(-112px)}.integrated-wheel .l3{transform:rotate(90deg) translateY(-112px)}.integrated-wheel .l4{transform:rotate(135deg) translateY(-112px)}.integrated-wheel .l5{transform:rotate(180deg) translateY(-112px)}.integrated-wheel .l6{transform:rotate(225deg) translateY(-112px)}.integrated-wheel .l7{transform:rotate(270deg) translateY(-112px)}.integrated-wheel .l8{transform:rotate(315deg) translateY(-112px)}.integrated-wheel .wheel-result{position:absolute;right:3%;top:44%;width:19%;margin:0;padding:12px;border:1px solid #5b5125;border-radius:8px;font-size:12px;line-height:1.45}.feature-nav .feature-tab span{display:inline-block;transform-origin:center}.feature-nav .feature-tab.active span{filter:drop-shadow(0 0 7px #ffd000)}.feature-nav .feature-tab:nth-child(1).icon-play span{animation:iconPulse .9s ease-in-out}.feature-nav .feature-tab:nth-child(2).icon-play span{animation:iconCart .9s ease-in-out}.feature-nav .feature-tab:nth-child(3).icon-play span{animation:iconGift .9s ease-in-out}.feature-nav .feature-tab:nth-child(4).icon-play span{animation:iconTicket .9s ease-in-out}.feature-nav .feature-tab:nth-child(5).icon-play span{animation:iconRank .9s ease-in-out}.feature-nav .feature-tab:nth-child(6).icon-play span{animation:iconCrown .9s ease-in-out}@keyframes iconPulse{50%{transform:scale(1.2);opacity:.7}}@keyframes iconCart{45%{transform:translateX(4px) rotate(-4deg)}55%{transform:translateX(-3px) rotate(3deg)}}@keyframes iconGift{45%{transform:translateY(-4px) rotate(-5deg)}55%{transform:translateY(-4px) rotate(5deg)}}@keyframes iconTicket{50%{transform:rotate(-10deg) scale(1.1)}}@keyframes iconRank{50%{transform:translateY(-4px)}}@keyframes iconCrown{45%{transform:rotate(-9deg)}55%{transform:rotate(9deg)}}
+.feature-page[data-feature-page="vip"]{padding-top:18px;padding-bottom:18px}.feature-page[data-feature-page="vip"] .vip-wrap{max-width:470px;padding:16px 20px 20px}.feature-page[data-feature-page="vip"] .vip-card{display:grid;grid-template-columns:72px 1fr;align-items:center;gap:12px;margin:12px 24px;padding:18px 22px;min-height:135px}.feature-page[data-feature-page="vip"] .vip-card .vip-badge{grid-row:1/5;text-align:center}.feature-page[data-feature-page="vip"] .vip-card p,.feature-page[data-feature-page="vip"] .vip-card small{margin:3px 0}.feature-page[data-feature-page="vip"] .vip-list{display:grid;grid-template-columns:1fr 1fr;column-gap:20px;padding:0 28px;line-height:1.7}.feature-page[data-feature-page="vip"] .vip-months{margin:16px 18px 0;padding-top:12px;border-top:1px solid #2c2c2c;word-spacing:12px;line-height:1.8}.feature-page[data-feature-page="vip"] .vip-bottom{display:none!important}
+@media(max-width:700px){.feature-entry{left:9px;bottom:90px}.feature-modal{padding:3vh 3vw}.feature-dialog{width:94vw;height:94vh}.feature-page{padding:25px 15px}.buy-cards{grid-template-columns:1fr;gap:70px}.bet-stepper{margin-bottom:85px}.coupon-box{padding:25px 20px}.rank-table{font-size:11px}.vip-card{margin:16px 5px}.vip-list{padding:0 10px}.integrated-wheel{padding:85px 5px 10px}.integrated-ticket{left:4%;right:auto;top:12px;width:42%}.integrated-wheel .wheel-result{right:4%;top:12px;width:42%}.integrated-wheel .wheel-stage{height:420px}}
+
+/* Slot-game placement: launcher sits beside the logo; dialog belongs to viewport. */
+#app .feature-entry{
+  position:absolute;left:auto;right:10px;top:12px;bottom:auto;
+  width:42px;height:42px;border-radius:50%;font-size:22px;
+  display:grid;place-items:center;padding:0;background:linear-gradient(145deg,#3f2615,#17100d);
+  box-shadow:0 4px 14px #0009,0 0 10px #ffc43d55;
+}
+.feature-modal{font-family:Inter,Arial,sans-serif;color:#fff;box-sizing:border-box}
+.feature-modal *{box-sizing:border-box}
+.feature-entry:focus-visible,.feature-close:focus-visible,.feature-tab:focus-visible,.wheel-spin:focus-visible{outline:3px solid #fff;outline-offset:2px}
+@media(max-width:700px){#app .feature-entry{left:auto;right:10px;top:12px;bottom:auto}.feature-dialog{width:96vw;height:92dvh}}
+
+/* Portrait slot integration ------------------------------------------------ */
+#app .feature-entry{
+  left:auto;right:24px;top:32px;bottom:auto;
+  width:32px;height:32px;border-width:1.5px;
+  font-size:17px;line-height:1;
+  box-shadow:0 3px 9px #0009,0 0 7px #ffc43d44;
+}
+
+.feature-modal{padding:4dvh 3vw}
+.feature-dialog{
+  width:min(94vw,calc(92dvh * 430 / 932),430px);
+  height:min(92dvh,calc(94vw * 932 / 430),932px);
+  border-radius:18px;
+}
+.feature-title{height:58px;font-size:20px}
+.feature-nav{height:62px;align-items:end;padding-inline:5px}
+.feature-tab{flex:1;min-width:0;width:auto;height:50px;font-size:23px}
+.feature-pages{height:calc(100% - 120px)}
+.feature-page{padding:18px 14px}
+
+.integrated-wheel{padding:84px 8px 12px}
+.integrated-ticket{left:4%;top:14px;width:43%;padding:9px;font-size:9px}
+.integrated-ticket span{font-size:15px}
+.integrated-wheel .wheel-result{right:4%;top:14px;width:43%;padding:9px;font-size:10px}
+.integrated-wheel .wheel-stage{height:390px}
+.integrated-wheel .wheel-pointer{top:20px;font-size:34px}
+.integrated-wheel .lucky-wheel{width:248px;height:248px;border-width:9px}
+.integrated-wheel .wheel-spin{width:66px;height:66px;border-width:5px;font-size:16px}
+.integrated-wheel .wheel-label{font-size:9px}
+.integrated-wheel .l1{transform:rotate(0deg) translateY(-92px)}
+.integrated-wheel .l2{transform:rotate(45deg) translateY(-92px)}
+.integrated-wheel .l3{transform:rotate(90deg) translateY(-92px)}
+.integrated-wheel .l4{transform:rotate(135deg) translateY(-92px)}
+.integrated-wheel .l5{transform:rotate(180deg) translateY(-92px)}
+.integrated-wheel .l6{transform:rotate(225deg) translateY(-92px)}
+.integrated-wheel .l7{transform:rotate(270deg) translateY(-92px)}
+.integrated-wheel .l8{transform:rotate(315deg) translateY(-92px)}
+
+.bet-stepper{margin-bottom:64px}
+.buy-cards{grid-template-columns:1fr;gap:62px;max-width:300px;margin:auto}
+.buy-card{min-height:205px}
+.reward-grid{grid-template-columns:repeat(2,1fr);gap:10px}
+.reward-ticket{min-height:145px}
+.coupon-box{padding:22px 18px}
+.rank-table{font-size:10px;min-width:375px}
+.feature-page[data-feature-page="ranking"]{overflow-x:auto}
+.feature-page[data-feature-page="vip"] .vip-wrap{padding:12px}
+.feature-page[data-feature-page="vip"] .vip-card{grid-template-columns:58px 1fr;margin:10px 4px;padding:14px}
+.feature-page[data-feature-page="vip"] .vip-list{grid-template-columns:1fr;padding:0 8px}
+
+@media(max-width:380px){
+  #app .feature-entry{right:24px;top:32px}
+  .feature-modal{padding:2dvh 2vw}
+  .feature-dialog{width:min(96vw,calc(96dvh * 430 / 932));height:min(96dvh,calc(96vw * 932 / 430))}
+  .integrated-wheel .lucky-wheel{width:224px;height:224px}
+  .integrated-wheel .l1{transform:rotate(0deg) translateY(-82px)}
+  .integrated-wheel .l2{transform:rotate(45deg) translateY(-82px)}
+  .integrated-wheel .l3{transform:rotate(90deg) translateY(-82px)}
+  .integrated-wheel .l4{transform:rotate(135deg) translateY(-82px)}
+  .integrated-wheel .l5{transform:rotate(180deg) translateY(-82px)}
+  .integrated-wheel .l6{transform:rotate(225deg) translateY(-82px)}
+  .integrated-wheel .l7{transform:rotate(270deg) translateY(-82px)}
+  .integrated-wheel .l8{transform:rotate(315deg) translateY(-82px)}
+}
+
+/* Compact pass: tuned against the final portrait viewport. */
+#app .feature-entry{
+  right:3.7209%;
+  top:1.9313%;
+  width:9.3023%;
+  height:auto;
+  font-size:clamp(14px,4.8vw,21px);
+}
+
+.feature-dialog{font-size:11px}
+.feature-title{height:48px;padding:0 40px;font-size:14px;letter-spacing:.02em}
+.feature-close{right:9px;top:9px;width:25px;height:25px;font-size:17px}
+.feature-nav{height:48px;padding-inline:8px}
+.feature-tab{height:39px;font-size:16px}
+.feature-pages{height:calc(100% - 96px)}
+.feature-page{padding:12px 10px}
+
+/* Lucky Wheel */
+.integrated-wheel{padding:66px 8px 8px}
+.integrated-ticket{top:9px;height:48px;padding:6px;font-size:7px;line-height:1.2}
+.integrated-ticket span{font-size:11px}
+.integrated-wheel .wheel-result{top:-57px;height:48px;padding:5px;font-size:8px;line-height:1.25}
+.integrated-wheel .wheel-stage{height:286px}
+.integrated-wheel .wheel-pointer{top:4px;font-size:22px}
+.integrated-wheel .lucky-wheel{width:180px;height:180px;border-width:7px;box-shadow:0 0 0 3px #ab178f,0 0 18px #ff00e6}
+.integrated-wheel .lucky-wheel:before{inset:8px;border-width:2px}
+.integrated-wheel .wheel-spin{width:48px;height:48px;border-width:4px;font-size:11px}
+.integrated-wheel .wheel-label{width:52px;margin-left:-26px;font-size:7px;transform-origin:26px 0}
+.integrated-wheel .l1{transform:rotate(0deg) translateY(-66px)}
+.integrated-wheel .l2{transform:rotate(45deg) translateY(-66px)}
+.integrated-wheel .l3{transform:rotate(90deg) translateY(-66px)}
+.integrated-wheel .l4{transform:rotate(135deg) translateY(-66px)}
+.integrated-wheel .l5{transform:rotate(180deg) translateY(-66px)}
+.integrated-wheel .l6{transform:rotate(225deg) translateY(-66px)}
+.integrated-wheel .l7{transform:rotate(270deg) translateY(-66px)}
+.integrated-wheel .l8{transform:rotate(315deg) translateY(-66px)}
+
+/* Buy Feature */
+.feature-page[data-feature-page="buy"] .bet-stepper{grid-template-columns:36px 100px 36px;margin-bottom:38px}
+.feature-page[data-feature-page="buy"] .bet-stepper button{font-size:18px}
+.feature-page[data-feature-page="buy"] .bet-stepper strong{padding:8px;font-size:13px}
+.feature-page[data-feature-page="buy"] .buy-cards{max-width:250px;gap:38px}
+.feature-page[data-feature-page="buy"] .buy-card{min-height:118px;padding:28px 10px 28px}
+.feature-page[data-feature-page="buy"] .buy-art{top:-25px;font-size:32px}
+.feature-page[data-feature-page="buy"] .buy-card h3{font-size:12px;margin:4px}
+.feature-page[data-feature-page="buy"] .buy-card strong{font-size:13px;margin:6px}
+.feature-page[data-feature-page="buy"] .buy-action{padding:6px;font-size:10px}
+
+/* Reward Store */
+.feature-page[data-feature-page="campaign"]{padding:10px}
+.feature-page[data-feature-page="campaign"] .reward-head{padding-bottom:8px;font-size:9px}
+.feature-page[data-feature-page="campaign"] .reward-head strong{font-size:16px}
+.feature-page[data-feature-page="campaign"] .reward-grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;margin-top:9px}
+.feature-page[data-feature-page="campaign"] .reward-ticket{min-height:104px;padding:7px 3px 27px}
+.feature-page[data-feature-page="campaign"] .reward-ticket .ticket-art{width:45px;height:32px;font-size:10px;border-width:1px}
+.feature-page[data-feature-page="campaign"] .reward-ticket strong{font-size:8px;line-height:1.15}
+.feature-page[data-feature-page="campaign"] .reward-ticket em{left:3px;right:3px;bottom:4px;padding:4px;font-size:8px}
+
+/* Coupon */
+.feature-page[data-feature-page="coupon"] .coupon-box{max-width:250px;padding:15px 14px;border-width:1px}
+.feature-page[data-feature-page="coupon"] .coupon-icon{font-size:32px}
+.feature-page[data-feature-page="coupon"] input{margin:14px 0 18px;padding:9px;font-size:11px}
+.feature-page[data-feature-page="coupon"] .redeem{width:145px;padding:8px;font-size:11px}
+.feature-page[data-feature-page="coupon"] .coupon-foot{margin-top:16px;padding-top:12px;font-size:10px}
+
+/* Leaderboard */
+.feature-page[data-feature-page="ranking"] .rank-filters button{padding:7px;font-size:9px}
+.feature-page[data-feature-page="ranking"] .rank-table{font-size:7px}
+.feature-page[data-feature-page="ranking"] .rank-table th,
+.feature-page[data-feature-page="ranking"] .rank-table td{padding:5px 2px}
+
+/* VIP */
+.feature-page[data-feature-page="vip"] .vip-wrap{max-width:250px;padding:9px;font-size:9px}
+.feature-page[data-feature-page="vip"] .vip-head span{padding:6px}
+.feature-page[data-feature-page="vip"] .vip-card{grid-template-columns:42px 1fr;min-height:96px;padding:10px;margin:7px 2px}
+.feature-page[data-feature-page="vip"] .vip-badge{font-size:30px}
+.feature-page[data-feature-page="vip"] .vip-wrap h3{padding-left:5px;font-size:11px}
+.feature-page[data-feature-page="vip"] .vip-list{font-size:9px;line-height:1.45}
+.feature-page[data-feature-page="vip"] .vip-months{font-size:8px;line-height:1.5;margin-top:8px;padding-top:7px}
+
+@media(max-width:380px){
+  #app .feature-entry{right:3.7209%;top:1.9313%;width:9.3023%}
+  .integrated-wheel .lucky-wheel{width:166px;height:166px}
+}
+
+/* Final proportional placement and per-page portrait alignment. */
+#app .feature-entry{
+  /* Logo right edge = 350/430; free area = 80. A 32px control leaves 24px each side. */
+  right:5.5814%;
+  top:1.9313%;
+  width:7.4419%;
+  height:auto;
+  aspect-ratio:1;
+  min-width:0;
+  min-height:0;
+  font-size:clamp(11px,4vw,17px);
+}
+
+.feature-close{width:30px;height:30px;right:12px;top:12px;font-size:20px}
+.feature-title{padding:0 48px;font-size:18px;white-space:nowrap}
+
+/* Lucky Wheel: two equal info cards, pointer and wheel on one center axis. */
+.integrated-wheel{padding:88px 10px 14px}
+.integrated-ticket{left:4%;top:14px;width:43%;height:64px;padding:8px;overflow:hidden}
+.integrated-wheel .wheel-stage{height:405px;width:100%;margin:0}
+.integrated-wheel .wheel-result{
+  right:2%;left:auto;top:-74px;width:43%;height:64px;
+  display:grid;place-items:center;margin:0;padding:8px;overflow:hidden;
+}
+.integrated-wheel .wheel-pointer{top:10px;left:50%;transform:translateX(-50%);font-size:32px}
+.integrated-wheel .lucky-wheel{width:240px;height:240px;flex:0 0 auto}
+
+/* Buy Feature: compact vertical cards on a shared center line. */
+.feature-page[data-feature-page="buy"]{padding-top:16px}
+.feature-page[data-feature-page="buy"] .bet-stepper{margin:0 auto 52px}
+.feature-page[data-feature-page="buy"] .buy-cards{width:100%;max-width:286px;gap:48px}
+.feature-page[data-feature-page="buy"] .buy-card{min-height:150px;padding:38px 14px 34px}
+.feature-page[data-feature-page="buy"] .buy-art{top:-34px;font-size:48px}
+
+/* Reward Store: consistent two-column cards and gutters. */
+.feature-page[data-feature-page="campaign"]{padding:14px}
+.feature-page[data-feature-page="campaign"] .reward-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:12px}
+.feature-page[data-feature-page="campaign"] .reward-ticket{min-width:0;min-height:132px;padding:9px 5px 34px}
+.feature-page[data-feature-page="campaign"] .reward-ticket strong{font-size:11px}
+.feature-page[data-feature-page="campaign"] .ticket-art{width:62px;height:44px;font-size:15px}
+
+/* Coupon is vertically balanced instead of sticking to the top. */
+.feature-page[data-feature-page="coupon"].active{display:grid;place-items:center}
+.feature-page[data-feature-page="coupon"] .coupon-box{width:100%;max-width:286px;margin:0;padding:22px 18px}
+
+/* Leaderboard must fit without horizontal drift. */
+.feature-page[data-feature-page="ranking"]{overflow-x:hidden;padding:16px 10px}
+.feature-page[data-feature-page="ranking"] .rank-filters{width:100%;margin-bottom:14px}
+.feature-page[data-feature-page="ranking"] .rank-table{width:100%;min-width:0;table-layout:fixed;font-size:9px}
+.feature-page[data-feature-page="ranking"] .rank-table th,
+.feature-page[data-feature-page="ranking"] .rank-table td{padding:7px 3px;overflow-wrap:anywhere;text-align:center}
+.feature-page[data-feature-page="ranking"] .rank-table th:nth-child(1){width:9%}
+.feature-page[data-feature-page="ranking"] .rank-table th:nth-child(2){width:31%}
+.feature-page[data-feature-page="ranking"] .rank-table th:nth-child(3){width:20%}
+.feature-page[data-feature-page="ranking"] .rank-table th:nth-child(4){width:27%}
+.feature-page[data-feature-page="ranking"] .rank-table th:nth-child(5){width:13%}
+
+/* VIP uses the same internal width and center axis as other pages. */
+.feature-page[data-feature-page="vip"] .vip-wrap{width:100%;max-width:286px;margin:auto}
+
+@media(max-width:380px){
+  #app .feature-entry{right:5.5814%;top:1.9313%;width:7.4419%;height:auto}
+  .feature-title{font-size:16px}
+  .integrated-wheel .lucky-wheel{width:218px;height:218px}
+}
+/* Final portrait sizing constraints: keep the launcher readable and the wheel clear of the dialog edges. */
+#app .feature-entry {
+  right: 2.7907% !important;
+  top: 1.9313% !important;
+  width: 11.1628% !important;
+  height: auto !important;
+  aspect-ratio: 1 !important;
+  font-size: clamp(17px, 5.4vw, 24px) !important;
+}
+
+.feature-title {
+  box-sizing: border-box !important;
+  height: 44px !important;
+  padding: 0 48px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  font-size: 12px !important;
+  line-height: 1 !important;
+  letter-spacing: .01em !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-align: center !important;
+}
+
+.feature-close {
+  right: 8px !important;
+  top: 8px !important;
+  width: 24px !important;
+  height: 24px !important;
+  font-size: 16px !important;
+}
+
+.feature-nav {
+  height: 44px !important;
+}
+
+.feature-pages {
+  height: calc(100% - 88px) !important;
+}
+
+.integrated-wheel {
+  padding: 58px 8px 8px !important;
+}
+
+.integrated-ticket {
+  top: 8px !important;
+  height: 42px !important;
+  padding: 5px !important;
+  font-size: 7px !important;
+}
+
+.integrated-ticket span {
+  font-size: 10px !important;
+}
+
+.integrated-wheel .wheel-result {
+  top: -50px !important;
+  height: 42px !important;
+  padding: 5px !important;
+  font-size: 7px !important;
+}
+
+.integrated-wheel .wheel-stage {
+  position: relative !important;
+  width: 100% !important;
+  height: 240px !important;
+  margin: 0 auto !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  overflow: visible !important;
+}
+
+.integrated-wheel .wheel-pointer {
+  top: 4px !important;
+  left: 50% !important;
+  transform: translateX(-50%) !important;
+  font-size: 18px !important;
+}
+
+.integrated-wheel .lucky-wheel {
+  position: relative !important;
+  width: 140px !important;
+  height: 140px !important;
+  min-width: 140px !important;
+  min-height: 140px !important;
+  flex: 0 0 140px !important;
+  margin: 0 auto !important;
+  border-width: 6px !important;
+}
+
+.integrated-wheel .wheel-spin {
+  width: 40px !important;
+  height: 40px !important;
+  border-width: 3px !important;
+  font-size: 9px !important;
+}
+
+.integrated-wheel .wheel-label {
+  width: 42px !important;
+  margin-left: -21px !important;
+  font-size: 6px !important;
+  transform-origin: 21px 0 !important;
+}
+
+.integrated-wheel .wheel-label.l1 { transform: rotate(0deg) translateY(-50px) rotate(0deg) !important; }
+.integrated-wheel .wheel-label.l2 { transform: rotate(45deg) translateY(-50px) rotate(-45deg) !important; }
+.integrated-wheel .wheel-label.l3 { transform: rotate(90deg) translateY(-50px) rotate(-90deg) !important; }
+.integrated-wheel .wheel-label.l4 { transform: rotate(135deg) translateY(-50px) rotate(-135deg) !important; }
+.integrated-wheel .wheel-label.l5 { transform: rotate(180deg) translateY(-50px) rotate(-180deg) !important; }
+.integrated-wheel .wheel-label.l6 { transform: rotate(225deg) translateY(-50px) rotate(-225deg) !important; }
+.integrated-wheel .wheel-label.l7 { transform: rotate(270deg) translateY(-50px) rotate(-270deg) !important; }
+.integrated-wheel .wheel-label.l8 { transform: rotate(315deg) translateY(-50px) rotate(-315deg) !important; }
+
+/* Match secondary pages to the compact Lucky Wheel scale. */
+#app .feature-entry {
+  font-size: 0 !important;
+}
+
+
+
+.feature-page[data-feature-page="buy"] .bet-stepper button {
+  min-height: 36px !important;
+  font-size: 15px !important;
+}
+
+.feature-page[data-feature-page="buy"] .bet-stepper strong {
+  display: grid !important;
+  place-items: center !important;
+  padding: 6px !important;
+  font-size: 10px !important;
+}
+
+.feature-page[data-feature-page="buy"] .buy-cards {
+  width: 100% !important;
+  max-width: 250px !important;
+  margin: 0 auto !important;
+  gap: 30px !important;
+}
+
+.feature-page[data-feature-page="buy"] .buy-card {
+  min-height: 105px !important;
+  padding: 25px 8px 24px !important;
+  border-radius: 8px !important;
+}
+
+.feature-page[data-feature-page="buy"] .buy-art {
+  top: -22px !important;
+  font-size: 28px !important;
+}
+
+.feature-page[data-feature-page="buy"] .buy-card h3 {
+  margin: 3px !important;
+  font-size: 10px !important;
+}
+
+.feature-page[data-feature-page="buy"] .buy-card strong {
+  margin: 4px !important;
+  font-size: 11px !important;
+}
+
+.feature-page[data-feature-page="buy"] .buy-card small,
+.feature-page[data-feature-page="buy"] .buy-card em {
+  font-size: 8px !important;
+}
+
+.feature-page[data-feature-page="buy"] .buy-action {
+  padding: 5px !important;
+  font-size: 8px !important;
+}
+
+.feature-page[data-feature-page="coupon"].active {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 12px 10px !important;
+}
+
+.feature-page[data-feature-page="coupon"] .coupon-box {
+  width: 100% !important;
+  max-width: 250px !important;
+  min-height: 0 !important;
+  margin: 0 auto !important;
+  padding: 16px 14px !important;
+  border-width: 1px !important;
+  border-radius: 8px !important;
+}
+
+.feature-page[data-feature-page="coupon"] .coupon-icon {
+  font-size: 28px !important;
+  line-height: 1 !important;
+}
+
+.feature-page[data-feature-page="coupon"] input {
+  height: 34px !important;
+  margin: 12px 0 !important;
+  padding: 7px 9px !important;
+  border-width: 1px !important;
+  font-size: 9px !important;
+}
+
+.feature-page[data-feature-page="coupon"] .redeem {
+  width: 132px !important;
+  padding: 7px !important;
+  font-size: 9px !important;
+}
+
+.feature-page[data-feature-page="coupon"] .coupon-foot {
+  margin-top: 13px !important;
+  padding-top: 10px !important;
+  font-size: 9px !important;
+  line-height: 1.3 !important;
+}
+
+/* Keep the hamburger entirely inside its ring and mask artwork behind it. */
+#app .feature-entry {
+  overflow: hidden !important;
+  isolation: isolate !important;
+  width: 13.0233% !important;
+  right: 2.3256% !important;
+  border: 3px solid #ffe36a !important;
+  background: #271407 !important;
+  box-shadow: 0 3px 10px #000a, 0 0 7px #ffc43d55 !important;
+}
+
+#app .feature-entry::before {
+  content: "";
+  display: block;
+  
+  position: absolute !important;
+  left: 50% !important;
+  top: 50% !important;
+  width: 16px !important;
+  height: 19px !important;
+  transform: translate(-50%, -50%) !important;
+  background:
+    linear-gradient(to bottom,
+      #ffd600 0 3px,
+      transparent 3px 8px,
+      #ffd600 8px 11px,
+      transparent 11px 16px,
+      #ffd600 16px 19px) !important;
+}
