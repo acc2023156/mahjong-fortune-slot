@@ -6,6 +6,21 @@ import { GameScene } from './game/GameScene'
 import { createFeatureCenter } from './ui/featureCenter'
 
 const assetUrl = (fileName: string) => `${import.meta.env.BASE_URL}assets/${fileName}`
+
+const syncVisualViewport = () => {
+  const viewport = window.visualViewport
+  const width = viewport?.width ?? window.innerWidth
+  const height = viewport?.height ?? window.innerHeight
+  document.documentElement.style.setProperty('--viewport-width', `${Math.round(width)}px`)
+  document.documentElement.style.setProperty('--viewport-height', `${Math.round(height)}px`)
+}
+
+syncVisualViewport()
+window.addEventListener('resize', syncVisualViewport, { passive: true })
+window.addEventListener('orientationchange', syncVisualViewport, { passive: true })
+window.visualViewport?.addEventListener('resize', syncVisualViewport, { passive: true })
+window.visualViewport?.addEventListener('scroll', syncVisualViewport, { passive: true })
+
 document.documentElement.style.setProperty(
   '--backplate-image',
   `url("${assetUrl('mahjong-backplate.png')}")`,

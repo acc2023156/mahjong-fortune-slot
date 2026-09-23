@@ -1,6 +1,18 @@
-:root { font-family: Arial, sans-serif; background: #173f2f; color: #fff; }
+:root {
+  font-family: Arial, sans-serif;
+  background: #173f2f;
+  color: #fff;
+  --viewport-width: 100vw;
+  --viewport-height: 100dvh;
+}
 * { box-sizing: border-box; }
-html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; }
+html, body {
+  width: 100%;
+  height: 100%;
+  min-height: 100dvh;
+  margin: 0;
+  overflow: hidden;
+}
 body {
   position: fixed;
   inset: 0;
@@ -20,7 +32,7 @@ body::after {
   position: relative;
   z-index: 1;
   flex: 0 0 auto;
-  width: min(100vw, calc(100dvh * 430 / 932));
+  width: min(var(--viewport-width), calc(var(--viewport-height) * 430 / 932));
   aspect-ratio: 430 / 932;
   background: linear-gradient(180deg, rgba(114, 21, 23, .96), rgba(151, 55, 30, .98));
   box-shadow: 0 0 42px rgba(33, 8, 2, .72);
@@ -34,4 +46,25 @@ canvas {
   height: 100% !important;
   touch-action: none;
   user-select: none;
+}
+
+/* Portrait browsers have a much wider visible ratio than the game artwork.
+   Fill the live visual viewport so browser bars never reveal the side backplate. */
+@media (orientation: portrait) {
+  body {
+    width: var(--viewport-width);
+    height: var(--viewport-height);
+    align-items: flex-start;
+    justify-content: flex-start;
+    background: #7d201d;
+  }
+
+  body::after { display: none; }
+
+  #app {
+    width: var(--viewport-width);
+    height: var(--viewport-height);
+    aspect-ratio: auto;
+    box-shadow: none;
+  }
 }
