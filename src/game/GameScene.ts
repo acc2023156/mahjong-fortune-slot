@@ -18,7 +18,7 @@ export class GameScene extends Container {
 
   constructor(logoTexture: Texture, showWinTexture: Texture) {
     super()
-    this.addChild(new Graphics().rect(0, 0, 430, 932).fill({ color: '#6d181b', alpha: 0.9 }))
+    this.addChild(new Graphics().rect(0, 0, 430, 760).fill({ color: '#6d181b', alpha: 0.94 }))
     const logo = new Sprite(logoTexture)
     logo.anchor.set(0.5)
     logo.width = 270
@@ -37,19 +37,19 @@ export class GameScene extends Container {
       this.addChild(multiplier)
     })
 
-    this.reels.position.set(16, 166)
+    this.reels.position.set(16, 158)
     this.addChild(this.reels)
 
     const showWin = new Sprite(showWinTexture)
-    showWin.position.set(0, 627)
+    showWin.position.set(0, 522)
     showWin.width = 430
     showWin.height = 96
     this.addChild(showWin)
     this.winBanner = new Text({ text: 'GOOD LUCK', style: { fontFamily: 'Arial Black', fontSize: 24, fontWeight: '900', fontStyle: 'italic', fill: '#ffe36e' } })
     this.winBanner.anchor.set(0.5)
-    this.winBanner.position.set(215, 688)
+    this.winBanner.position.set(215, 578)
     this.addChild(this.winBanner)
-    this.status.position.set(16, 724)
+    this.status.position.set(16, 610)
     this.addChild(this.status)
 
     this.controls = new SpinControls({
@@ -59,7 +59,7 @@ export class GameScene extends Container {
       toggleTurbo: () => { this.turbo = !this.turbo; this.controls.setTurbo(this.turbo) },
       toggleAuto: () => this.toggleAuto(),
     })
-    this.controls.position.set(0, 790)
+    this.controls.position.set(0, 654)
     this.addChild(this.controls)
   }
 
