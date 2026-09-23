@@ -2,6 +2,7 @@ import { Container, Graphics, Sprite, Text, type Texture } from 'pixi.js'
 import { ReelGrid } from './components/ReelGrid'
 import { SpinControls } from './components/SpinControls'
 import { StatusPanel } from './components/StatusPanel'
+import { AudioEngine } from './AudioEngine'
 
 export class GameScene extends Container {
   private balance = 1000
@@ -15,6 +16,9 @@ export class GameScene extends Container {
   private readonly status = new StatusPanel()
   private readonly controls: SpinControls
   private readonly winBanner: Text
+  private readonly multiplierLabels: Text[] = []
+  private readonly fxLayer = new Container()
+  private readonly audio = new AudioEngine()
 
   constructor(logoTexture: Texture, showWinTexture: Texture) {
     super()
@@ -35,10 +39,13 @@ export class GameScene extends Container {
       multiplier.anchor.set(0.5)
       multiplier.position.set(70 + i * 96, 130)
       this.addChild(multiplier)
+      this.multiplierLabels.push(multiplier)
     })
 
     this.reels.position.set(16, 158)
     this.addChild(this.reels)
+    this.fxLayer.position.set(16, 158)
+    this.addChild(this.fxLayer)
 
     const showWin = new Sprite(showWinTexture)
     showWin.position.set(0, 522)
@@ -75,18 +82,30 @@ export class GameScene extends Container {
       return
     }
     this.spinning = true
+    this.audio.spin()
     this.balance -= this.bet
     this.win = 0
     this.winBanner.text = 'GOOD LUCK'
     this.controls.setSpinning(true)
     this.updateStatus()
-    this.reels.spin((multiplier) => {
+    this.setMultiplier(1)
+    this.reels.spin({
+      settle: () => this.audio.settle(),
+      tumble: (chain, multiplier, win) => {
+        this.setMultiplier(multiplier)
+        this.winBanner.text = `${chain} 連消  ×${multiplier}   +${(win * this.bet).toFixed(2)}`
+        this.audio.tumble(chain)
+        this.emitCoins()
+      },
+      complete: (multiplier) => {
       this.win = multiplier * this.bet
       this.balance += this.win
       this.winBanner.text = this.win > 0 ? `WIN  ${this.win.toFixed(2)}` : 'TRY AGAIN'
+      if (this.win > 0) this.audio.win(multiplier)
       this.controls.setSpinning(false)
       this.spinning = false
       this.updateStatus()
+      },
     })
   }
 
@@ -104,5 +123,36 @@ export class GameScene extends Container {
 
   private updateStatus() {
     this.status.setValues(this.balance, this.bet, this.win)
+  }
+
+  private setMultiplier(value: number) {
+    const steps = [1, 2, 3, 5]
+    const match = steps.findIndex(step => step >= value)
+    const active = match === -1 ? steps.length - 1 : match
+    this.multiplierLabels.forEach((label, index) => {
+      label.style.fill = index === active ? '#fff07a' : '#123d37'
+      label.scale.set(index === active ? 1.14 : 1)
+    })
+  }
+
+  private emitCoins() {
+    for (let index = 0; index < 14; index++) {
+      const coin = new Graphics().circle(0, 0, 3 + Math.random() * 4).fill(index % 3 ? '#ffd45b' : '#fff0a2')
+      coin.position.set(40 + Math.random() * 320, 80 + Math.random() * 210)
+      this.fxLayer.addChild(coin)
+      const originY = coin.y
+      const drift = (Math.random() - 0.5) * 80
+      const start = performance.now()
+      const animate = () => {
+        const progress = Math.min(1, (performance.now() - start) / 620)
+        coin.x += drift * 0.018
+        coin.y = originY - Math.sin(progress * Math.PI) * (40 + Math.random() * 20) + progress * 55
+        coin.alpha = 1 - progress
+        coin.rotation += 0.18
+        if (progress < 1) requestAnimationFrame(animate)
+        else coin.destroy()
+      }
+      requestAnimationFrame(animate)
+    }
   }
 }

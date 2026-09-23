@@ -42,7 +42,11 @@ export class ReelGrid extends Container {
     this.cells[row][col].style.fill = SYMBOL_COLORS[value]
   }
 
-  spin(onComplete: (multiplier: number) => void) {
+  spin(callbacks: {
+    complete: (multiplier: number) => void
+    settle: () => void
+    tumble: (chain: number, multiplier: number, win: number) => void
+  }) {
     if (this.running) return
     this.running = true
     const start = performance.now()
@@ -58,7 +62,8 @@ export class ReelGrid extends Container {
         }
       }
       if (elapsed < 1180) return requestAnimationFrame(animate)
-      void this.runTumbles(onComplete)
+      callbacks.settle()
+      void this.runTumbles(callbacks)
     }
     requestAnimationFrame(animate)
   }
@@ -86,21 +91,23 @@ export class ReelGrid extends Container {
     return { payout, wins }
   }
 
-  private wait(ms: number) { return new Promise(resolve => window.setTimeout(resolve, ms)) }
-
-  private async runTumbles(onComplete: (multiplier: number) => void) {
+  private async runTumbles(callbacks: {
+    complete: (multiplier: number) => void
+    tumble: (chain: number, multiplier: number, win: number) => void
+  }) {
     let total = 0
     for (let tumble = 0; tumble < TUMBLE_MULTIPLIERS.length; tumble++) {
       const result = this.evaluateWays()
       if (!result.wins.size) break
       const mult = TUMBLE_MULTIPLIERS[tumble]
       total += result.payout * mult
+      callbacks.tumble(tumble + 1, mult, result.payout * mult)
       result.wins.forEach(key => {
         const [row, col] = key.split(':').map(Number)
         this.cells[row][col].alpha = 0.25
         this.cells[row][col].scale.set(1.18)
       })
-      await this.wait(330)
+      await this.animateWin(result.wins)
       for (let col = 0; col < REEL_COLUMNS; col++) {
         const survivors = [] as SymbolId[]
         for (let row = REEL_ROWS - 1; row >= 0; row--) {
@@ -112,11 +119,54 @@ export class ReelGrid extends Container {
           this.cells[row][col].alpha = 1
           this.cells[row][col].scale.set(1)
           this.setSymbol(row, col, next[row])
+          this.cells[row][col].y -= 42 + row * 8
+          this.cells[row][col].alpha = 0
         }
       }
-      await this.wait(220)
+      await this.animateDrop()
     }
     this.running = false
-    onComplete(total)
+    callbacks.complete(total)
+  }
+
+  private animateWin(wins: Set<string>) {
+    const start = performance.now()
+    return new Promise<void>(resolve => {
+      const frame = () => {
+        const progress = Math.min(1, (performance.now() - start) / 360)
+        wins.forEach(key => {
+          const [row, col] = key.split(':').map(Number)
+          this.cells[row][col].alpha = 1 - progress
+          this.cells[row][col].scale.set(1 + Math.sin(progress * Math.PI) * 0.34)
+        })
+        if (progress < 1) requestAnimationFrame(frame)
+        else resolve()
+      }
+      requestAnimationFrame(frame)
+    })
+  }
+
+  private animateDrop() {
+    const start = performance.now()
+    return new Promise<void>(resolve => {
+      const frame = () => {
+        const progress = Math.min(1, (performance.now() - start) / 260)
+        const eased = 1 - Math.pow(1 - progress, 3)
+        for (const row of this.cells) for (const cell of row) {
+          cell.alpha = eased
+          const targetY = 10 + this.cells.indexOf(row) * 89 + 41
+          cell.y += (targetY - cell.y) * Math.min(1, eased * 0.42 + 0.12)
+        }
+        if (progress < 1) requestAnimationFrame(frame)
+        else {
+          for (let row = 0; row < REEL_ROWS; row++) for (let col = 0; col < REEL_COLUMNS; col++) {
+            this.cells[row][col].position.y = 10 + row * 89 + 41
+            this.cells[row][col].alpha = 1
+          }
+          resolve()
+        }
+      }
+      requestAnimationFrame(frame)
+    })
   }
 }
