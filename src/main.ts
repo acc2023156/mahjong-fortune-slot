@@ -1,8 +1,9 @@
 import './style.css'
 import './feature-center.css'
-import { Application, Assets, type Texture } from 'pixi.js'
+import { Application } from 'pixi.js'
 import { GAME_HEIGHT, GAME_WIDTH } from './game/config'
 import { GameScene } from './game/GameScene'
+import { loadSkin } from './game/skin'
 import { createFeatureCenter } from './ui/featureCenter'
 
 const assetUrl = (fileName: string) => `${import.meta.env.BASE_URL}assets/${fileName}`
@@ -38,7 +39,9 @@ await app.init({
 })
 
 document.querySelector<HTMLDivElement>('#app')!.appendChild(app.canvas)
-const logoTexture = await Assets.load<Texture>(assetUrl('logo-300.png'))
-const showWinTexture = await Assets.load<Texture>(assetUrl('ShowWinpng.png'))
-app.stage.addChild(new GameScene(logoTexture, showWinTexture))
+await loadSkin()
+const scene = new GameScene()
+app.stage.addChild(scene)
+// Dev-only handle for QA in the browser console (stripped from production builds).
+if (import.meta.env.DEV) Object.assign(window, { __slot: scene })
 createFeatureCenter(document.querySelector<HTMLDivElement>('#app')!)

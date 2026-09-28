@@ -1,0 +1,106 @@
+import { Assets, Container, Sprite, type Texture } from 'pixi.js'
+import type { SymbolId } from './config'
+
+// Sprites sliced from the reference atlases by scripts/extract-skin.py.
+const SKIN_NAMES = [
+  'tile_white', 'tile_gold', 'tile_side', 'win_frame', 'ingot', 'glyph_fa', 'glyph_zhong', 'glyph_bai', 'glyph_wan8', 'glyph_tong5',
+  'glyph_suo5', 'glyph_tong2', 'glyph_suo2', 'glyph_hu', 'text_wild',
+  'spin_idle', 'spin_round', 'spin_arrows', 'plaque_purple', 'plaque_win',
+  'header_red', 'panel_wood', 'bar_ways', 'bar_mult', 'felt',
+  'mult_x1', 'mult_x2', 'mult_x3', 'mult_x4', 'mult_x5', 'mult_x6', 'mult_x10',
+  'msg_scatter', 'msg_ways', 'msg_free_x10', 'msg_gold', 'msg_x5', 'title_ways', 'label_win', 'label_total_win',
+  'title_total_win', 'btn_collect', 'label_remaining', 'label_last_free', 'title_free_won', 'label_start',
+  'label_doubled', 'title_big_win', 'title_mega_win', 'title_super_mega_win',
+  'coin', 'coin_side', 'coin_mound', 'flying_tiles', 'star',
+  'icon_turbo_off', 'icon_turbo_on', 'icon_plus', 'icon_play',
+] as const
+
+const DIGIT_KEYS = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'x', 'dot'] as const
+
+/** Effect frame sequences from the reference atlases, in playback order. */
+const SEQUENCE_LENGTHS = { turn: 6, burst: 9, coinspin: 8, plaquefx: 7, hl: 3, hufx: 2 } as const
+
+export type SkinName = (typeof SKIN_NAMES)[number]
+export type DigitKey = (typeof DIGIT_KEYS)[number]
+export type SequenceName = keyof typeof SEQUENCE_LENGTHS
+
+type Skin = Record<SkinName, Texture> & {
+  digits: Record<'gold' | 'silver', Record<DigitKey, Texture>>
+  frames: Record<SequenceName, Texture[]>
+}
+
+let loaded: Skin | undefined
+
+export const skinUrl = (path: string) => `${import.meta.env.BASE_URL}assets/${path}`
+
+export async function loadSkin() {
+  const entries = await Promise.all(SKIN_NAMES.map(async (name) =>
+    [name, await Assets.load<Texture>(skinUrl(`skin/${name}.png`))] as const))
+  const digits = { gold: {}, silver: {} } as Skin['digits']
+  await Promise.all((['gold', 'silver'] as const).flatMap((tint) => DIGIT_KEYS.map(async (key) => {
+    digits[tint][key] = await Assets.load<Texture>(skinUrl(`skin/digit_${tint}_${key}.png`))
+  })))
+  const frames = {} as Skin['frames']
+  await Promise.all(Object.entries(SEQUENCE_LENGTHS).map(async ([name, length]) => {
+    frames[name as SequenceName] = await Promise.all(Array.from({ length }, (_, index) =>
+      Assets.load<Texture>(skinUrl(`skin/${name}_${index}.png`))))
+  }))
+  loaded = { ...Object.fromEntries(entries), digits, frames } as Skin
+  return loaded
+}
+
+export function skin(): Skin {
+  if (!loaded) throw new Error('Skin textures used before loadSkin() resolved')
+  return loaded
+}
+
+/** Sprite scaled to fit width (and optionally height), anchored at centre. */
+export function skinSprite(name: SkinName, width?: number, height?: number) {
+  const sprite = new Sprite(skin()[name])
+  sprite.anchor.set(.5)
+  if (width !== undefined && height !== undefined) sprite.setSize(width, height)
+  else if (width !== undefined) sprite.scale.set(width / sprite.texture.width)
+  else if (height !== undefined) sprite.scale.set(height / sprite.texture.height)
+  return sprite
+}
+
+export const GLYPHS: Record<Exclude<SymbolId, 'wild'>, SkinName> = {
+  scatter: 'glyph_hu', fa: 'glyph_fa', zhong: 'glyph_zhong', bai: 'glyph_bai', wan8: 'glyph_wan8',
+  tong5: 'glyph_tong5', suo5: 'glyph_suo5', tong2: 'glyph_tong2', suo2: 'glyph_suo2',
+}
+
+/** Sprite-font number (gold or silver digits from the reference atlas), centred on its origin. */
+export class SpriteNumber extends Container {
+  private current = ''
+  private readonly glyphHeight: number
+  private readonly digitTint: 'gold' | 'silver'
+
+  constructor(glyphHeight: number, digitTint: 'gold' | 'silver' = 'gold') {
+    super()
+    this.glyphHeight = glyphHeight
+    this.digitTint = digitTint
+  }
+
+  set text(value: string) {
+    if (value === this.current) return
+    this.current = value
+    this.removeChildren().forEach((child) => child.destroy())
+    const digits = skin().digits[this.digitTint]
+    const scale = this.glyphHeight / 62
+    let x = 0
+    for (const char of value) {
+      if (char === ',') continue
+      const key = (char === '.' ? 'dot' : char.toLowerCase()) as DigitKey
+      const texture = digits[key]
+      if (!texture) { x += 16 * scale; continue }
+      const sprite = new Sprite(texture)
+      sprite.scale.set(scale)
+      sprite.position.set(x, -this.glyphHeight / 2)
+      this.addChild(sprite)
+      x += texture.width * scale * (key === 'dot' ? 1 : .86)
+    }
+    for (const child of this.children) child.x -= x / 2
+  }
+
+  get text() { return this.current }
+}
