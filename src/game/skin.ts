@@ -33,18 +33,27 @@ let loaded: Skin | undefined
 
 export const skinUrl = (path: string) => `${import.meta.env.BASE_URL}assets/${path}`
 
-export async function loadSkin() {
-  const entries = await Promise.all(SKIN_NAMES.map(async (name) =>
-    [name, await Assets.load<Texture>(skinUrl(`skin/${name}.png`))] as const))
+/** Loads every skin texture in parallel; `onProgress` receives 0..1 as files arrive. */
+export async function loadSkin(onProgress?: (progress: number) => void) {
+  const sequences = Object.entries(SEQUENCE_LENGTHS) as [SequenceName, number][]
+  const total = SKIN_NAMES.length + DIGIT_KEYS.length * 2 + sequences.reduce((sum, [, length]) => sum + length, 0)
+  let done = 0
+  const load = async (file: string) => {
+    const texture = await Assets.load<Texture>(skinUrl(`skin/${file}.png`))
+    onProgress?.(++done / total)
+    return texture
+  }
   const digits = { gold: {}, silver: {} } as Skin['digits']
-  await Promise.all((['gold', 'silver'] as const).flatMap((tint) => DIGIT_KEYS.map(async (key) => {
-    digits[tint][key] = await Assets.load<Texture>(skinUrl(`skin/digit_${tint}_${key}.png`))
-  })))
   const frames = {} as Skin['frames']
-  await Promise.all(Object.entries(SEQUENCE_LENGTHS).map(async ([name, length]) => {
-    frames[name as SequenceName] = await Promise.all(Array.from({ length }, (_, index) =>
-      Assets.load<Texture>(skinUrl(`skin/${name}_${index}.png`))))
-  }))
+  const [entries] = await Promise.all([
+    Promise.all(SKIN_NAMES.map(async (name) => [name, await load(name)] as const)),
+    ...(['gold', 'silver'] as const).flatMap((tint) => DIGIT_KEYS.map(async (key) => {
+      digits[tint][key] = await load(`digit_${tint}_${key}`)
+    })),
+    ...sequences.map(async ([name, length]) => {
+      frames[name] = await Promise.all(Array.from({ length }, (_, index) => load(`${name}_${index}`)))
+    }),
+  ])
   loaded = { ...Object.fromEntries(entries), digits, frames } as Skin
   return loaded
 }
