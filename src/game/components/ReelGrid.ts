@@ -5,7 +5,7 @@ import {
 } from '../config'
 import { GLYPHS, skin } from '../skin'
 
-export type ReelEvent = 'reelStop' | 'scatter' | 'highlight' | 'flip' | 'wild' | 'drop'
+export type ReelEvent = 'reelStop' | 'scatter' | 'highlight' | 'flip' | 'wild' | 'dropStart' | 'drop'
 
 export type ReelSpinCallbacks = {
   freeMode: boolean
@@ -539,6 +539,7 @@ export class ReelGrid extends Container {
       .filter((col) => col >= 0)
       .reverse()
     const order = new Map(falling.map((col, index) => [col, index]))
+    if (falling.length) callbacks.sound('dropStart')
     const fall = callbacks.turbo ? 120 : 220
     const bounce = callbacks.turbo ? 40 : 80
     const stagger = callbacks.turbo ? 30 : 120

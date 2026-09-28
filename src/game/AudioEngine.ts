@@ -1,6 +1,23 @@
+import { soundSprites, voiceSprites, type SoundName, type VoiceName } from './audioSprites'
+
+type Bank = 'general_audio' | 'vox'
+
+const audioUrl = (file: string) => `${import.meta.env.BASE_URL}assets/pgsoft-reference/audio/audio/mp3/${file}`
+
+/** Minimum gap between repeats of one cue; the reference plays one landing cue per settle. */
+const THROTTLE_MS: Partial<Record<SoundName, number>> = { tilesLand: 700, reelStop: 70 }
+
+/**
+ * Plays the original audio sprites (general_audio.mp3 / vox.mp3) via Web Audio and the
+ * original music loops via <audio>. See audioSprites.ts for the verified event mapping.
+ */
 export class AudioEngine {
   private context?: AudioContext
   private music?: HTMLAudioElement
+  private readonly buffers = new Map<Bank, Promise<AudioBuffer>>()
+  private activeVoice?: AudioBufferSourceNode
+  private readonly looping = new Map<SoundName, AudioBufferSourceNode>()
+  private readonly lastPlayed = new Map<SoundName, number>()
 
   private getContext() {
     this.context ??= new AudioContext()
@@ -8,87 +25,96 @@ export class AudioEngine {
     return this.context
   }
 
-  private tone(frequency: number, duration: number, type: OscillatorType = 'sine', gain = 0.045, delay = 0) {
+  private load(bank: Bank) {
     const context = this.getContext()
-    const oscillator = context.createOscillator()
-    const volume = context.createGain()
-    const start = context.currentTime + delay
-    oscillator.type = type
-    oscillator.frequency.setValueAtTime(frequency, start)
-    volume.gain.setValueAtTime(gain, start)
-    volume.gain.exponentialRampToValueAtTime(0.0001, start + duration)
-    oscillator.connect(volume).connect(context.destination)
-    oscillator.start(start)
-    oscillator.stop(start + duration)
+    let pending = this.buffers.get(bank)
+    if (!pending) {
+      pending = fetch(audioUrl(`${bank}.mp3`))
+        .then((response) => {
+          if (!response.ok) throw new Error(`Audio ${bank}: HTTP ${response.status}`)
+          return response.arrayBuffer()
+        })
+        .then((bytes) => context.decodeAudioData(bytes))
+      this.buffers.set(bank, pending)
+      pending.catch((error) => { this.buffers.delete(bank); console.error(error) })
+    }
+    return pending
   }
 
-  spin() {
-    ;[180, 210, 245, 280].forEach((frequency, index) => this.tone(frequency, 0.08, 'triangle', 0.025, index * 0.055))
-  }
-
-  tumble(chain: number) {
-    const root = 480 + chain * 70
-    this.tone(root, 0.16, 'sine', 0.05)
-    this.tone(root * 1.5, 0.2, 'triangle', 0.035, 0.06)
-  }
-
-  settle() { this.tone(150, 0.09, 'triangle', 0.025) }
-
-  reelStop(col: number) { this.tone(120 + col * 6, 0.07, 'triangle', 0.03) }
-
-  /** 胡 landing: low gong plus a bright shimmer, pitched up for each later reel. */
-  scatter(col: number) {
-    const lift = 1 + col * .06
-    this.tone(98 * lift, .9, 'sine', .08)
-    this.tone(196 * lift, .7, 'triangle', .035, .01)
-    ;[784, 988, 1175].forEach((frequency, index) => this.tone(frequency * lift, .25, 'sine', .03, .05 + index * .05))
-  }
-
-  /** Column-by-column win highlight: a rising chime per lit reel. */
-  highlight(col: number) {
-    const scale = [659, 784, 880, 1047, 1175]
-    this.tone(scale[col] ?? 1175, .22, 'sine', .045)
-    this.tone((scale[col] ?? 1175) * 2, .12, 'triangle', .012, .02)
-  }
-
-  /** Tiles flip away into coins: a burst of metallic clinks. */
-  coins() {
-    for (let index = 0; index < 7; index++) {
-      this.tone(2200 + Math.random() * 1600, .07, 'square', .012, index * .035)
-      this.tone(3200 + Math.random() * 900, .05, 'sine', .018, index * .035 + .01)
+  private async play(bank: Bank, [offset, duration]: readonly [number, number], options: { volume?: number; voice?: boolean; key?: SoundName } = {}) {
+    const requested = performance.now()
+    try {
+      const buffer = await this.load(bank)
+      // Never play a stale cue after a slow first download.
+      if (performance.now() - requested > 600) return
+      const context = this.getContext()
+      const source = context.createBufferSource()
+      const gain = context.createGain()
+      source.buffer = buffer
+      gain.gain.value = options.volume ?? .7
+      source.connect(gain).connect(context.destination)
+      if (options.voice) { this.activeVoice?.stop(); this.activeVoice = source }
+      if (options.key) { this.looping.get(options.key)?.stop(); this.looping.set(options.key, source) }
+      source.onended = () => {
+        source.disconnect(); gain.disconnect()
+        if (this.activeVoice === source) this.activeVoice = undefined
+        if (options.key && this.looping.get(options.key) === source) this.looping.delete(options.key)
+      }
+      source.start(0, offset / 1000, duration / 1000)
+    } catch (error) {
+      console.error('Audio sprite playback failed', error)
     }
   }
 
-  wild() {
-    ;[523, 784, 1047, 1568].forEach((frequency, index) => this.tone(frequency, .3, 'sine', .04, index * .06))
+  sound(name: SoundName, volume?: number) {
+    // Cues fired by several reels in the same moment (stops, landings) play once, not stacked.
+    const now = performance.now()
+    if (now - (this.lastPlayed.get(name) ?? -Infinity) < (THROTTLE_MS[name] ?? 60)) return
+    this.lastPlayed.set(name, now)
+    void this.play('general_audio', soundSprites[name], { volume })
   }
+  /** A cue that can be cut short later with stop(name), e.g. the Big Win bed. */
+  held(name: SoundName, volume?: number) { void this.play('general_audio', soundSprites[name], { volume, key: name }) }
+  stop(name: SoundName) { this.looping.get(name)?.stop() }
+  voice(name: VoiceName) { void this.play('vox', voiceSprites[name], { volume: .85, voice: true }) }
 
-  drop() {
-    this.tone(90, .12, 'sine', .07)
-    this.tone(180, .06, 'triangle', .02, .01)
-  }
+  /** Decode both banks early (after the first user gesture) so the first cues are not dropped. */
+  warmUp() { void this.load('general_audio'); void this.load('vox') }
 
-  win(multiplier: number) {
-    const notes = multiplier >= 10 ? [523, 659, 784, 1047] : [523, 659, 784]
-    notes.forEach((frequency, index) => this.tone(frequency, 0.3, 'sine', 0.055, index * 0.11))
+  // --- game events -------------------------------------------------------------------------
+  spin() { this.sound('spinButton'); this.sound('reelSpin', .5) }
+  button() { this.sound('button') }
+  reelStop(_col: number) { this.sound('reelStop') }
+  settle() { this.sound('tilesLand') }
+  scatter(_col: number) { this.sound('scatterLand') }
+  anticipation(active: boolean) { if (active) this.sound('drumRoll') }
+  /** Winners light up column by column; the original cue starts with the first column. */
+  highlight(col: number) { if (col === 0) this.sound('winHighlight') }
+  wild() { this.sound('wildTransform') }
+  dropStart() { this.sound('dropStart', .6) }
+  drop() { this.sound('tilesLand', .6) }
+  plaque() { this.sound('winPlaque') }
+  multiplier(value: number) {
+    this.sound('multiplierUp')
+    const key = `multiplier_${value}` as VoiceName
+    if (key in voiceSprites) this.voice(key)
   }
+  freeGame() { this.voice('hu') }
+  totalWin() { this.sound('coinRoll') }
+  bigWin() { this.held('bigWinMain', .8) }
+  bigWinEnd() { this.stop('bigWinMain'); this.sound('bigWinEnd', .8) }
 
   playMusic(freeMode = false) {
+    this.warmUp()
     const file = freeMode ? 'bgm_bonus_loop.mp3' : 'bgm_mg.mp3'
-    const url = `${import.meta.env.BASE_URL}assets/pgsoft-reference/audio/audio/mp3/${file}`
     if (this.music?.src.endsWith(file)) {
       void this.music.play().catch(() => undefined)
       return
     }
     this.music?.pause()
-    this.music = new Audio(url)
+    this.music = new Audio(audioUrl(file))
     this.music.loop = true
     this.music.volume = .22
     void this.music.play().catch(() => undefined)
-  }
-
-  anticipation(active: boolean) {
-    if (!active) return
-    ;[260, 330, 420, 540].forEach((frequency, index) => this.tone(frequency, .42, 'sine', .035, index * .45))
   }
 }

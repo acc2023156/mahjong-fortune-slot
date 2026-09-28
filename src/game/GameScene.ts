@@ -207,10 +207,10 @@ export class GameScene extends Container {
 
     this.controls = new SpinControls({
       spin: () => this.spin(),
-      decreaseBet: () => this.changeBet(-5),
-      increaseBet: () => this.changeBet(5),
-      toggleTurbo: () => { this.turbo = !this.turbo; this.controls.setTurbo(this.turbo) },
-      toggleAuto: () => this.toggleAuto(),
+      decreaseBet: () => { this.audio.button(); this.changeBet(-5) },
+      increaseBet: () => { this.audio.button(); this.changeBet(5) },
+      toggleTurbo: () => { this.audio.button(); this.turbo = !this.turbo; this.controls.setTurbo(this.turbo) },
+      toggleAuto: () => { this.audio.button(); this.toggleAuto() },
     })
     this.controls.position.set(0, 620)
     this.addChild(this.controls)
@@ -249,6 +249,7 @@ export class GameScene extends Container {
     this.controls.setSpinning(true)
     this.updateStatus()
     this.setMultiplier(freeMode ? 2 : 1, freeMode)
+    let railValue = freeMode ? 2 : 1
     this.reels.spin({
       freeMode,
       turbo: this.turbo,
@@ -263,18 +264,22 @@ export class GameScene extends Container {
         this.win += win * this.bet
         this.plaque.showAmount(this.win, false, previous)
         this.plaque.flash()
+        this.audio.plaque()
       },
       advance: (next) => {
         this.setMultiplier(next, freeMode)
-        this.audio.tumble(1)
+        // Rail cue + spoken multiplier only when the value actually steps up (x5 / x10 cap repeats silently).
+        if (next !== railValue) this.audio.multiplier(next)
+        railValue = next
       },
       sound: (event, index = 0) => {
         if (event === 'reelStop') this.audio.reelStop(index)
         else if (event === 'scatter') this.audio.scatter(index)
         else if (event === 'highlight') this.audio.highlight(index)
-        else if (event === 'flip') this.audio.coins()
         else if (event === 'wild') this.audio.wild()
-        else this.audio.drop()
+        else if (event === 'dropStart') this.audio.dropStart()
+        else if (event === 'drop') this.audio.drop()
+        // 'flip' is covered by the win-highlight cue, which runs through the tile turn.
       },
       complete: (totalWin, scatters) => {
         this.win = totalWin * this.bet
@@ -282,7 +287,6 @@ export class GameScene extends Container {
         if (freeMode) this.freeGameWin += this.win
         if (this.win > 0) {
           this.plaque.showAmount(this.win, true)
-          this.audio.win(totalWin)
         } else if (!freeMode) {
           this.plaque.showMessages()
         }
@@ -362,6 +366,7 @@ export class GameScene extends Container {
     this.freeSpinsRemaining = freeSpinsForScatters(scatterCount)
     this.freeGameWin = 0
     this.audio.playMusic(true)
+    this.audio.freeGame()
     const count = new SpriteNumber(120)
     count.text = String(this.freeSpinsRemaining)
     this.showModal('title_free_won', count, 'label_doubled', 'label_start', () => {
@@ -375,6 +380,7 @@ export class GameScene extends Container {
     const total = this.freeGameWin
     this.audio.playMusic(false)
     this.controls.setCounter(null)
+    this.audio.totalWin()
     const amount = new SpriteNumber(72)
     amount.text = total.toFixed(2)
     this.showModal('title_total_win', amount, undefined, 'btn_collect', () => {
@@ -432,6 +438,7 @@ export class GameScene extends Container {
     button.eventMode = 'static'
     button.cursor = 'pointer'
     button.on('pointertap', () => {
+      this.audio.button()
       this.modalLayer.removeChildren().forEach((child) => child.destroy({ children: true }))
       onClose()
     })
@@ -450,12 +457,14 @@ export class GameScene extends Container {
     value.position.set(GAME_WIDTH / 2, 380)
     this.modalLayer.addChild(heading, value)
     this.popIn(heading)
+    this.audio.bigWin()
     const duration = this.turbo ? 1200 : 3000
     const start = performance.now()
     let finished = false
     const finish = () => {
       if (finished) return
       finished = true
+      this.audio.bigWinEnd()
       this.modalLayer.removeChildren().forEach((child) => child.destroy({ children: true }))
       done()
     }
