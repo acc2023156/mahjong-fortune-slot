@@ -94,14 +94,20 @@ export class AudioEngine {
   wild() { this.sound('wildTransform') }
   dropStart() { this.sound('dropStart', .6) }
   drop() { this.sound('tilesLand', .6) }
-  plaque() { this.sound('winPlaque') }
   multiplier(value: number) {
     this.sound('multiplierUp')
     const key = `multiplier_${value}` as VoiceName
     if (key in voiceSprites) this.voice(key)
   }
-  freeGame() { this.voice('hu') }
+  /** FREE SPINS WON appears (#3, matched at the screen change) with the 胡 call. */
+  freeSpinsWon() { this.sound('clickLong'); this.voice('hu') }
+  /** START / COLLECT on the feature screens (#36, matched at both presses). */
+  confirm() { this.sound('huang') }
+  /** Rail relabels to the free-game multipliers (#34, matched at the flip). */
+  railFlip() { this.sound('railFlip') }
+  /** TOTAL WIN count-up (#4) and its end (#5), both matched against the reference. */
   totalWin() { this.sound('coinRoll') }
+  totalWinEnd() { this.sound('coinRollEnd') }
   bigWin() { this.held('bigWinMain', .8) }
   bigWinEnd() { this.stop('bigWinMain'); this.sound('bigWinEnd', .8) }
 

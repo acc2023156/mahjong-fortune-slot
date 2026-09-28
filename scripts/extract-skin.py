@@ -80,7 +80,7 @@ SPRITES = {
     'title_total_win': ('totalwin', [(0, 0, 596, 138)], 0),
     'btn_collect': ('totalwin', [(0, 140, 234, 81)], 0),
     'label_remaining': ('freespins', [(0, 0, 361, 124)], 0),
-    'label_last_free': ('freespins', [(380, 0, 586, 124)], 0),
+    'label_last_free': ('freespins', [(396, 0, 570, 124)], 0),
     'title_free_won': ('bonus', [(0, 571, 170, 698)], 90),
     'label_start': ('bonus', [(0, 0, 170, 42)], 0),
     'label_doubled': ('bonus', [(0, 95, 170, 477)], 90),
