@@ -175,7 +175,10 @@ def main():
             part = crop(source, [rect], 0)
             (luminance_to_alpha(part) if lum else part).save(OUT / f'{prefix}_{index}.png')
             frames += 1
-    print(f'wrote {len(SPRITES) + 2 * len(DIGITS) + frames} sprites to {OUT}')
+    # The game loads WebP (~72% smaller than PNG); the PNGs stay as lossless sources.
+    for png in OUT.glob('*.png'):
+        Image.open(png).save(png.with_suffix('.webp'), 'WEBP', quality=86, method=6)
+    print(f'wrote {len(SPRITES) + 2 * len(DIGITS) + frames} sprites (+ .webp) to {OUT}')
 
 
 if __name__ == '__main__':

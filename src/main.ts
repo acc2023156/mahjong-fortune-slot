@@ -67,8 +67,15 @@ try {
 } catch (error) {
   // Surface startup failures instead of leaving a silent blank canvas.
   console.error(error)
-  const message = document.createElement('pre')
-  message.style.cssText = 'position:absolute;inset:auto 8px 8px;color:#fff;font:12px monospace;white-space:pre-wrap'
-  message.textContent = `Failed to start: ${error instanceof Error ? error.stack ?? error.message : String(error)}`
+  loading.remove()
+  const message = document.createElement('div')
+  message.style.cssText = 'position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:80%;text-align:center;color:#ffe9b0;font:700 15px Arial,sans-serif;line-height:1.6'
+  message.textContent = '網路不穩，部分素材下載失敗。'
+  const retry = document.createElement('button')
+  retry.textContent = '重新載入'
+  retry.style.cssText = 'display:block;margin:14px auto 0;padding:10px 26px;border:2px solid #ffd366;border-radius:10px;background:#b4221c;color:#ffe790;font:700 16px Arial,sans-serif;cursor:pointer'
+  // Files that did arrive are already cached, so a reload only fetches what is missing.
+  retry.onclick = () => location.reload()
+  message.appendChild(retry)
   mount.appendChild(message)
 }

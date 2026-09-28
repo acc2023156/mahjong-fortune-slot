@@ -37,14 +37,33 @@ type Skin = Record<SkinName, Texture> & {
 let loaded: Skin | undefined
 
 export const skinUrl = (path: string) => `${import.meta.env.BASE_URL}assets/${path}`
+/** Game textures ship as WebP (~72% smaller than the PNG sources in the same folder). */
+const skinFile = (file: string) => skinUrl(`skin/${file}.webp`)
+
+/**
+ * Loads one texture, retrying transient network failures (slow CDN routes drop requests)
+ * instead of failing the whole start-up. Retries use a distinct URL so a failed attempt
+ * is not served back from Pixi's asset cache.
+ */
+async function loadTexture(file: string, attempts = 3): Promise<Texture> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      const url = skinFile(file)
+      return await Assets.load<Texture>(attempt === 0 ? url : { src: url, alias: `${url}#retry${attempt}` })
+    } catch (error) {
+      if (attempt + 1 >= attempts) throw error
+      await new Promise((resolve) => window.setTimeout(resolve, 600 * (attempt + 1)))
+    }
+  }
+}
 
 /** Every media URL the game needs, for seeding the client cache (see public/sw.js). */
 export function skinUrls() {
   const sequences = Object.entries(SEQUENCE_LENGTHS) as [SequenceName, number][]
   return [
-    ...SKIN_NAMES.map((name) => skinUrl(`skin/${name}.png`)),
-    ...(['gold', 'silver'] as const).flatMap((tint) => DIGIT_KEYS.map((key) => skinUrl(`skin/digit_${tint}_${key}.png`))),
-    ...sequences.flatMap(([name, length]) => Array.from({ length }, (_, index) => skinUrl(`skin/${name}_${index}.png`))),
+    ...SKIN_NAMES.map((name) => skinFile(name)),
+    ...(['gold', 'silver'] as const).flatMap((tint) => DIGIT_KEYS.map((key) => skinFile(`digit_${tint}_${key}`))),
+    ...sequences.flatMap(([name, length]) => Array.from({ length }, (_, index) => skinFile(`${name}_${index}`))),
   ]
 }
 
@@ -56,7 +75,7 @@ export async function loadSkin(onProgress?: (progress: number) => void) {
   const total = CORE_NAMES.length + DIGIT_KEYS.length * 2 + sequences.reduce((sum, [, length]) => sum + length, 0)
   let done = 0
   const load = async (file: string) => {
-    const texture = await Assets.load<Texture>(skinUrl(`skin/${file}.png`))
+    const texture = await loadTexture(file)
     onProgress?.(++done / total)
     return texture
   }
@@ -78,7 +97,7 @@ export async function loadSkin(onProgress?: (progress: number) => void) {
 /** Streams the feature-screen textures in the background; safe to call repeatedly. */
 export function loadDeferredSkin() {
   deferred ??= Promise.all(DEFERRED_NAMES.map(async (name) => {
-    skin()[name] = await Assets.load<Texture>(skinUrl(`skin/${name}.png`))
+    skin()[name] = await loadTexture(name)
   })).then(() => undefined)
   deferred.catch(() => { deferred = undefined })
   return deferred
