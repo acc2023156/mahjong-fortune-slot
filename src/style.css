@@ -32,8 +32,8 @@ body::after {
   position: relative;
   z-index: 1;
   flex: 0 0 auto;
-  width: min(var(--viewport-width), calc(var(--viewport-height) * 430 / 760));
-  aspect-ratio: 430 / 760;
+  width: min(var(--viewport-width), calc(var(--viewport-height) * 430 / 932));
+  aspect-ratio: 430 / 932;
   background: linear-gradient(180deg, rgba(114, 21, 23, .96), rgba(151, 55, 30, .98));
   box-shadow: 0 0 42px rgba(33, 8, 2, .72);
   overflow: hidden;
@@ -46,14 +46,6 @@ canvas {
   height: 100% !important;
   touch-action: none;
   user-select: none;
-}
-
-body::after {
-  content: '';
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  background: radial-gradient(circle at 50% 45%, transparent 20%, rgba(35, 0, 0, .28) 100%);
 }
 
 /* Portrait browsers have a much wider visible ratio than the game artwork.
