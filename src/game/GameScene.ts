@@ -267,7 +267,10 @@ export class GameScene extends Container {
       advance: (next) => {
         this.setMultiplier(next, freeMode)
         // Rail cue + spoken multiplier only when the value actually steps up (x5 / x10 cap repeats silently).
-        if (next !== railValue) this.audio.multiplier(next)
+        if (next !== railValue) {
+          this.audio.multiplier(next)
+          this.flashRail(next, freeMode)
+        }
         railValue = next
       },
       sound: (event, index = 0) => {
@@ -357,6 +360,31 @@ export class GameScene extends Container {
       sprite.tint = isActive ? 0xffffff : INACTIVE_TINT
       sprite.scale.set((isActive ? 46 : 38) / sprite.texture.height)
     })
+  }
+
+  /** Rail step-up (reference): the newly lit label pops with a short gold glow burst behind it. */
+  private flashRail(value: number, freeMode: boolean) {
+    const steps: readonly number[] = freeMode ? FREE_STEPS : BASE_STEPS
+    const index = steps.indexOf(value)
+    const label = this.multiplierSprites[index]
+    if (!label) return
+    const glow = new Sprite(skin().frames.hl[2])
+    glow.anchor.set(.5)
+    glow.tint = 0xffc030
+    glow.blendMode = 'add'
+    glow.position.copyFrom(label.position)
+    this.addChildAt(glow, this.getChildIndex(label))
+    const base = label.scale.x
+    const start = performance.now()
+    const frame = () => {
+      const t = Math.min(1, (performance.now() - start) / 450)
+      glow.setSize(80 + t * 70, 44 + t * 30)
+      glow.alpha = 1 - t
+      label.scale.set(base * (1 + .3 * Math.max(0, 1 - t / .6)))
+      if (t < 1) requestAnimationFrame(frame)
+      else { glow.destroy(); label.scale.set(base) }
+    }
+    requestAnimationFrame(frame)
   }
 
   private startFreeGame(scatterCount: number) {
