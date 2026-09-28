@@ -87,7 +87,8 @@ export class AudioEngine {
   reelStop(_col: number) { this.sound('reelStop') }
   settle() { this.sound('tilesLand') }
   scatter(_col: number) { this.sound('scatterLand') }
-  anticipation(active: boolean) { if (active) this.sound('drumRoll') }
+  /** Rising glissando at the start of every near-miss reel (4.04 s apart in the reference). */
+  nearMiss() { this.sound('sparkleRise', .8) }
   /** Winners light up column by column; the original cue starts with the first column. */
   highlight(col: number) { if (col === 0) this.sound('winHighlight') }
   wild() { this.sound('wildTransform') }

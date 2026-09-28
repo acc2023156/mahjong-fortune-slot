@@ -255,7 +255,6 @@ export class GameScene extends Container {
       turbo: this.turbo,
       settle: () => this.audio.settle(),
       anticipation: (active) => {
-        this.audio.anticipation(active)
         if (active) this.plaque.showMessages(['msg_scatter'])
       },
       tumble: (_chain, multiplier, win) => {
@@ -275,6 +274,7 @@ export class GameScene extends Container {
       sound: (event, index = 0) => {
         if (event === 'reelStop') this.audio.reelStop(index)
         else if (event === 'scatter') this.audio.scatter(index)
+        else if (event === 'nearMiss') this.audio.nearMiss()
         else if (event === 'highlight') this.audio.highlight(index)
         else if (event === 'wild') this.audio.wild()
         else if (event === 'dropStart') this.audio.dropStart()

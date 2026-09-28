@@ -5,7 +5,7 @@ import {
 } from '../config'
 import { GLYPHS, skin } from '../skin'
 
-export type ReelEvent = 'reelStop' | 'scatter' | 'highlight' | 'flip' | 'wild' | 'dropStart' | 'drop'
+export type ReelEvent = 'reelStop' | 'scatter' | 'nearMiss' | 'highlight' | 'flip' | 'wild' | 'dropStart' | 'drop'
 
 export type ReelSpinCallbacks = {
   freeMode: boolean
@@ -43,6 +43,10 @@ const STRIP_HEIGHT = PITCH_Y * SLOTS
 /** Spinning tiles cycle through [STRIP_TOP, STRIP_TOP + STRIP_HEIGHT), fully hidden at the top end. */
 const STRIP_TOP = BOARD_HEIGHT - STRIP_HEIGHT
 const DIM_TINT = 0x505050
+/** Each near-miss reel spins this long (measured: consecutive near-miss cues 4.04 s apart). */
+const NEAR_MISS_MS = 4040
+/** Near-miss reels spin slowly enough to read the tiles. */
+const NEAR_MISS_SPEED = .55
 
 type TileView = Container & { tile: Sprite; aura: Container; rays: Sprite; flame: Sprite; glyph: Sprite; ingot: Sprite; glow: Sprite; frame: Sprite }
 
@@ -61,8 +65,7 @@ export class ReelGrid extends Container {
   private readonly blurs: BlurFilter[] = []
   private readonly dim = new Graphics().rect(0, 0, BOARD_WIDTH, BOARD_HEIGHT).fill('#000')
   private readonly fxLayer = new Container()
-  private readonly shade = new Graphics()
-  private readonly beam = new Graphics()
+  private readonly nearMissLayer = new Container()
   private running = false
   private quickStopRequested = false
   private readonly strips = new ReelStrips()
@@ -102,9 +105,9 @@ export class ReelGrid extends Container {
     }
     // The dim sits between reels and highlighted tiles: highlighted tiles are raised above it.
     this.reelLayer.addChild(...[...this.columns].reverse(), this.dim)
-    this.shade.visible = false
-    this.beam.visible = false
-    this.addChild(this.shade, this.beam, this.fxLayer)
+    this.nearMissLayer.visible = false
+    this.buildNearMiss()
+    this.addChild(this.nearMissLayer, this.fxLayer)
     this.animateAuras()
   }
 
@@ -210,19 +213,29 @@ export class ReelGrid extends Container {
     this.running = true
     this.quickStopRequested = false
     const outcome = this.makeOutcome(false)
-    const anticipation = !callbacks.turbo && this.countScatters(outcome, 3) >= 2
-    const stopTimes = callbacks.turbo
-      ? [430, 430, 430, 430, 430]
-      : anticipation ? [780, 870, 960, 2500, 4200] : [780, 870, 960, 1050, 1140]
+    const stopTimes = callbacks.turbo ? [430, 430, 430, 430, 430] : [780, 870, 960, 1050, 1140]
+    // Reference near miss: once two 胡 have landed, every later reel becomes a slow near-miss
+    // reel in turn, each spinning NEAR_MISS_MS after the previous reel stops.
+    let firstNearMiss = -1
+    if (!callbacks.turbo) {
+      let landed = 0
+      for (let col = 0; col < REEL_COLUMNS - 1 && firstNearMiss < 0; col++) {
+        landed += outcome.filter((row) => row[col].symbol === 'scatter').length
+        if (landed >= 2) firstNearMiss = col + 1
+      }
+      if (firstNearMiss > 0) {
+        for (let col = firstNearMiss; col < REEL_COLUMNS; col++) stopTimes[col] = stopTimes[col - 1] + NEAR_MISS_MS
+      }
+    }
+    let nearMissCol = -1
     const phases = Array.from({ length: REEL_COLUMNS }, () => 0) // 0 spinning, 1 settling, 2 stopped
     const settleStarts = Array.from({ length: REEL_COLUMNS }, () => 0)
     const offsets = Array.from({ length: REEL_COLUMNS }, () => 0)
     const lastY = this.views.map((column) => column.map((view) => view.y))
     const start = performance.now()
     let lastFrame = start
-    let anticipationStarted = false
 
-    this.blurs.forEach((blur) => { blur.enabled = true })
+    this.blurs.forEach((blur) => { blur.enabled = true; blur.strengthY = 9 })
     const settleColumn = (col: number) => {
       if (phases[col] !== 0) return
       phases[col] = 1
@@ -246,7 +259,8 @@ export class ReelGrid extends Container {
           const acceleration = Math.min(1, elapsed / (callbacks.turbo ? 70 : 150))
           const remaining = stopTimes[col] - elapsed
           const braking = remaining < 220 ? .32 + .68 * Math.max(0, remaining / 220) : 1
-          offsets[col] += delta * (callbacks.turbo ? 2.45 : 1.72) * acceleration * braking
+          const speed = col === nearMissCol ? NEAR_MISS_SPEED : callbacks.turbo ? 2.45 : 1.72
+          offsets[col] += delta * speed * acceleration * braking
           for (let slot = 0; slot < SLOTS; slot++) {
             const y = STRIP_TOP + (this.slotY(slot) - STRIP_TOP + offsets[col]) % STRIP_HEIGHT
             // A tile that wrapped back to the top re-enters as a fresh random symbol.
@@ -266,20 +280,22 @@ export class ReelGrid extends Container {
             for (let slot = 0; slot < SLOTS; slot++) this.place(col, slot, this.slotY(slot))
             callbacks.sound('reelStop', col)
             this.celebrateScatters(col, callbacks)
+            const next = col + 1
+            if (!forceStop && firstNearMiss > 0 && next >= firstNearMiss && next < REEL_COLUMNS) {
+              if (nearMissCol < 0) callbacks.anticipation(true)
+              nearMissCol = next
+              this.showNearMiss(next)
+              callbacks.sound('nearMiss', next)
+            }
           }
         }
       }
-      if (anticipation && !forceStop && !anticipationStarted && elapsed >= stopTimes[2]) {
-        anticipationStarted = true
-        callbacks.anticipation(true)
-        this.showAnticipation(3)
-      }
-      if (anticipation && !forceStop && elapsed >= stopTimes[3]) this.showAnticipation(4)
       if (!phases.every((phase) => phase === 2)) return requestAnimationFrame(animate)
-      this.hideAnticipation()
-      callbacks.anticipation(false)
+      const hadNearMiss = nearMissCol >= 0
+      if (hadNearMiss) callbacks.anticipation(false)
       callbacks.settle()
-      void this.runTumbles(callbacks)
+      // After a near miss the darkness lifts over ~0.3 s before the board is evaluated.
+      void this.hideNearMiss(hadNearMiss ? 300 : 0).then(() => this.runTumbles(callbacks))
     }
     requestAnimationFrame(animate)
   }
@@ -324,26 +340,77 @@ export class ReelGrid extends Container {
     }
   }
 
-  private showAnticipation(activeColumn: number) {
-    const x = this.baseX(activeColumn)
-    this.shade.clear().rect(0, 0, Math.max(0, x - 3), BOARD_HEIGHT).fill({ color: '#000', alpha: .25 })
-    this.beam.clear()
-      .rect(x - 5, 0, CELL_WIDTH + 10, BOARD_HEIGHT).fill({ color: '#fff3a1', alpha: .16 })
-      .rect(x - 7, 0, 6, BOARD_HEIGHT).fill({ color: '#ffb400', alpha: .35 })
-      .rect(x - 4, 0, 3, BOARD_HEIGHT).fill({ color: '#ffe066', alpha: .95 })
-      .rect(x + CELL_WIDTH + 1, 0, 6, BOARD_HEIGHT).fill({ color: '#ffb400', alpha: .35 })
-      .rect(x + CELL_WIDTH + 1, 0, 3, BOARD_HEIGHT).fill({ color: '#ffe066', alpha: .95 })
-    // Landed reels go dark while their scatters stay bright.
+  /** Near-miss reel overlay from the reference sheet: thin gold frame, light column, edge glows, gold dust. */
+  private buildNearMiss() {
+    const [frame, column, edge] = skin().frames.nearmiss
+    const light = new Sprite(column)
+    light.anchor.set(.5)
+    light.blendMode = 'add'
+    light.alpha = .28
+    light.setSize(CELL_WIDTH * 1.2, BOARD_HEIGHT)
+    light.position.set(CELL_WIDTH / 2, BOARD_HEIGHT / 2)
+    const border = new Sprite(frame)
+    border.anchor.set(.5)
+    border.blendMode = 'add'
+    border.setSize(CELL_WIDTH + 12, BOARD_HEIGHT + 30)
+    border.position.set(CELL_WIDTH / 2, BOARD_HEIGHT / 2)
+    const edges = [-4, CELL_WIDTH + 4].map((x) => {
+      const glow = new Sprite(edge)
+      glow.anchor.set(.5)
+      glow.blendMode = 'add'
+      glow.setSize(22, BOARD_HEIGHT + 20)
+      glow.position.set(x, BOARD_HEIGHT / 2)
+      return glow
+    })
+    this.nearMissLayer.addChild(light, border, ...edges)
+    const dust: Sprite[] = []
+    for (let index = 0; index < 14; index++) {
+      const mote = new Sprite(skin().star)
+      mote.anchor.set(.5)
+      mote.blendMode = 'add'
+      mote.tint = 0xffc437
+      mote.position.set(Math.random() * CELL_WIDTH, Math.random() * BOARD_HEIGHT)
+      dust.push(mote)
+      this.nearMissLayer.addChild(mote)
+    }
+    const tick = (now: number) => {
+      if (this.nearMissLayer.visible) {
+        const pulse = .8 + Math.sin(now / 140) * .2
+        border.alpha = pulse
+        edges.forEach((glow) => { glow.alpha = pulse })
+        light.alpha = .22 + Math.sin(now / 260) * .08
+        dust.forEach((mote, index) => {
+          mote.y += .55 + (index % 3) * .25
+          if (mote.y > BOARD_HEIGHT) { mote.y = -10; mote.x = Math.random() * CELL_WIDTH }
+          mote.scale.set(.06 + .05 * Math.abs(Math.sin(now / 200 + index)))
+        })
+      }
+      requestAnimationFrame(tick)
+    }
+    requestAnimationFrame(tick)
+  }
+
+  /** Stopped reels go dark (胡 stay lit); the near-miss reel is framed and spins slowly. */
+  private showNearMiss(activeColumn: number) {
+    this.nearMissLayer.x = this.baseX(activeColumn)
+    this.nearMissLayer.visible = true
+    this.blurs[activeColumn].strengthY = 3
     for (let col = 0; col < activeColumn; col++) for (let slot = 0; slot < SLOTS; slot++) {
       this.views[col][slot].tint = this.states[col][slot].symbol === 'scatter' ? 0xffffff : DIM_TINT
     }
-    this.shade.visible = true
-    this.beam.visible = true
   }
 
-  private hideAnticipation() {
-    this.shade.visible = false
-    this.beam.visible = false
+  private async hideNearMiss(fadeMs: number) {
+    this.nearMissLayer.visible = false
+    const dimmed = this.views.flat().filter((view) => view.tint !== 0xffffff)
+    if (fadeMs > 0 && dimmed.length) {
+      const from = DIM_TINT & 0xff
+      await this.tween(fadeMs, (t) => {
+        const level = Math.round(from + (255 - from) * t)
+        const tint = (level << 16) | (level << 8) | level
+        dimmed.forEach((view) => { view.tint = tint })
+      })
+    }
     for (const column of this.views) for (const view of column) view.tint = 0xffffff
   }
 

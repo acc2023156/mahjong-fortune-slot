@@ -127,6 +127,9 @@ SEQUENCES = [
     # 胡 scatter aura: blurred orange 胡 glow and radial light rays.
     ('hufx', FX_A + '22480547-c484-4511-a172-585e6db7c80a.bf7c4.jpg',
      [(403, 158, 78, 84), (406, 7, 134, 136)], True),
+    # Near-miss reel: thin gold frame, yellow light column, thin edge glow.
+    ('nearmiss', FX_A + 'cb72e539-e2b7-41ce-9cac-e8e7c5e041e9.6bbc2.jpg',
+     [(235, 280, 52, 324), (85, 345, 136, 286), (279, 604, 35, 254)], True),
     # Win highlight: gold outline frame and inner glow around a tile.
     ('hl', FX_A + '2ada7886-83e0-4d3c-b651-eae6ad6b5c7a.22e5d.jpg',
      [(165, 13, 78, 81), (260, 2, 72, 76), (34, 150, 172, 68)], True),

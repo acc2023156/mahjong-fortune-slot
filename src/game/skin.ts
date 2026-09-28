@@ -23,7 +23,7 @@ const SKIN_NAMES = [...CORE_NAMES, ...DEFERRED_NAMES] as const
 const DIGIT_KEYS = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'x', 'dot'] as const
 
 /** Effect frame sequences from the reference atlases, in playback order. */
-const SEQUENCE_LENGTHS = { turn: 6, burst: 9, coinspin: 8, plaquefx: 7, hl: 3, hufx: 2 } as const
+const SEQUENCE_LENGTHS = { turn: 6, burst: 9, coinspin: 8, plaquefx: 7, hl: 3, hufx: 2, nearmiss: 3 } as const
 
 export type SkinName = (typeof SKIN_NAMES)[number]
 export type DigitKey = (typeof DIGIT_KEYS)[number]

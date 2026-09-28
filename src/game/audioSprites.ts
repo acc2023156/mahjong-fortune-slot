@@ -17,7 +17,7 @@ export const soundSprites = {
   coinRollEnd: [36080, 4720], //        #5  ~ counting finished
   swish: [41110, 780], //               #6  ? 咻
   wah: [42100, 820], //                 #7  ? 嘩
-  sparkleRise: [43090, 5600], //        #8  ? 閃爍上升
+  sparkleRise: [43090, 5600], //        #8  ✔ each near-miss reel starts (4 hits, z≈35–41)
   bright: [49180, 2520], //             #9  ? 清亮
   button: [52110, 290], //              #10 ✔ button press (with SPIN / Start)
   promptRise: [53290, 1200], //         #11 ? 提示音
@@ -31,7 +31,7 @@ export const soundSprites = {
   wildTransform: [69180, 1290], //      #19 ✔ gold tile turns into WILD
   dropStart: [71170, 1340], //          #20 ~ empty felt → tiles begin to fall
   dropAlt: [73170, 1550], //            #21 ~ around the drop
-  drumRoll: [75180, 1890], //           #22 ? 督嚕督嚕 — used for near-miss anticipation
+  drumRoll: [75180, 1890], //           #22 ? 督嚕督嚕
   lightCoins: [77180, 1750], //         #23 ? 燈ㄖ扔錢
   tilesLand: [79250, 1440], //          #24 ✔ reels settle / refill lands
   reelSpin: [81180, 1500], //           #25 ? 滾輪滾動
