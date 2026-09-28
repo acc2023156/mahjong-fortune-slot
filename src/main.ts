@@ -1,9 +1,10 @@
 import './style.css'
 import './feature-center.css'
-import { Application } from 'pixi.js'
+import { Application, Assets } from 'pixi.js'
 import { GAME_HEIGHT, GAME_WIDTH } from './game/config'
 import { GameScene } from './game/GameScene'
-import { loadSkin } from './game/skin'
+import { loadDeferredSkin, loadSkin, skinUrl, skinUrls } from './game/skin'
+import { registerClientCache, seedClientCache } from './game/clientCache'
 import { createFeatureCenter } from './ui/featureCenter'
 
 const assetUrl = (fileName: string) => `${import.meta.env.BASE_URL}assets/${fileName}`
@@ -26,6 +27,10 @@ document.documentElement.style.setProperty(
   '--backplate-image',
   `url("${assetUrl('mahjong-backplate.png')}")`,
 )
+
+registerClientCache()
+// Load textures on the main thread so the media service worker sees (and caches) every request.
+Assets.setPreferences({ preferWorkers: false })
 
 // One authoritative coordinate system prevents resize drift between DOM and Pixi.
 const app = new Application()
@@ -53,6 +58,12 @@ try {
   // Dev-only handle for QA in the browser console (stripped from production builds).
   if (import.meta.env.DEV) Object.assign(window, { __slot: scene })
   createFeatureCenter(mount)
+  // Stage 2: feature-screen art streams in behind the running game, then everything is cached.
+  void loadDeferredSkin().then(() => seedClientCache([
+    ...skinUrls(),
+    skinUrl('pgsoft-reference/audio/audio/mp3/general_audio.mp3'),
+    skinUrl('pgsoft-reference/audio/audio/mp3/vox.mp3'),
+  ]))
 } catch (error) {
   // Surface startup failures instead of leaving a silent blank canvas.
   console.error(error)

@@ -4,7 +4,7 @@ import { SpinControls } from './components/SpinControls'
 import { StatusPanel } from './components/StatusPanel'
 import { AudioEngine } from './AudioEngine'
 import { freeSpinsForScatters, GAME_HEIGHT, GAME_WIDTH } from './config'
-import { skin, skinSprite, SpriteNumber, type SkinName } from './skin'
+import { skin, skinSprite, SpriteNumber, whenDeferredReady, type SkinName } from './skin'
 
 const BOARD_Y = 112
 const PLAQUE_Y = 535
@@ -367,12 +367,15 @@ export class GameScene extends Container {
     this.freeGameWin = 0
     this.audio.playMusic(true)
     this.audio.freeGame()
-    const count = new SpriteNumber(120)
-    count.text = String(this.freeSpinsRemaining)
-    this.showModal('title_free_won', count, 'label_doubled', 'label_start', () => {
-      this.setMultiplier(2, true)
-      this.controls.setCounter(this.freeSpinsRemaining)
-      this.spin()
+    // Feature-screen art streams in after start-up; wait for it if it is still on its way.
+    whenDeferredReady(() => {
+      const count = new SpriteNumber(120)
+      count.text = String(this.freeSpinsRemaining)
+      this.showModal('title_free_won', count, 'label_doubled', 'label_start', () => {
+        this.setMultiplier(2, true)
+        this.controls.setCounter(this.freeSpinsRemaining)
+        this.spin()
+      })
     })
   }
 
@@ -381,13 +384,15 @@ export class GameScene extends Container {
     this.audio.playMusic(false)
     this.controls.setCounter(null)
     this.audio.totalWin()
-    const amount = new SpriteNumber(72)
-    amount.text = total.toFixed(2)
-    this.showModal('title_total_win', amount, undefined, 'btn_collect', () => {
-      this.setMultiplier(1, false)
-      this.win = total
-      this.plaque.showAmount(total, true)
-      this.updateStatus()
+    whenDeferredReady(() => {
+      const amount = new SpriteNumber(72)
+      amount.text = total.toFixed(2)
+      this.showModal('title_total_win', amount, undefined, 'btn_collect', () => {
+        this.setMultiplier(1, false)
+        this.win = total
+        this.plaque.showAmount(total, true)
+        this.updateStatus()
+      })
     })
   }
 
@@ -448,6 +453,10 @@ export class GameScene extends Container {
   }
 
   private showBigWin(amount: number, betMultiple: number, done: () => void) {
+    whenDeferredReady(() => this.presentBigWin(amount, betMultiple, done))
+  }
+
+  private presentBigWin(amount: number, betMultiple: number, done: () => void) {
     this.modalLayer.removeChildren().forEach((child) => child.destroy({ children: true }))
     this.celebrationBackdrop(this.modalLayer)
     const title: SkinName = betMultiple >= 60 ? 'title_super_mega_win' : betMultiple >= 35 ? 'title_mega_win' : 'title_big_win'
