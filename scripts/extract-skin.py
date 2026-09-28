@@ -120,10 +120,11 @@ SEQUENCES = [
     ('coinspin', FX_A + '8587692a-857e-4c8b-8a13-2bcd32268fda.4928a.png',
      [(7, 7, 102, 102), (128, 122, 91, 95), (237, 7, 92, 91), (241, 115, 85, 88), (225, 319, 76, 79), (128, 237, 76, 76),
       (323, 320, 75, 76), (238, 221, 82, 80)], False),
-    # WIN plaque payout flash: glowing bar bursting with coins.
-    ('plaquefx', FX_A + 'b0c8986a-cf13-49f0-9be8-0cc93f03adb2.19b16.jpg',
-     [(769, 1158, 289, 122), (25, 36, 503, 233), (6, 339, 538, 245), (553, 33, 526, 240), (21, 657, 510, 224),
-      (585, 361, 470, 200), (97, 975, 352, 203)], True),
+    # Tile clear: the edge-on tile bursts into coins in place with a glow (atlas frames are
+    # stored rotated 90°; a 5th rect value is the rotation). Order: flash → coins spread → fade.
+    ('tilefx', FX_A + 'b0c8986a-cf13-49f0-9be8-0cc93f03adb2.19b16.jpg',
+     [(769, 1158, 289, 122, 90), (1113, 23, 157, 327, 0), (25, 36, 503, 233, 90), (6, 339, 538, 245, 90),
+      (553, 33, 526, 240, 90), (21, 657, 510, 224, 90), (585, 361, 470, 200, 90), (97, 975, 352, 203, 90)], True),
     # 胡 scatter aura: blurred orange 胡 glow and radial light rays.
     ('hufx', FX_A + '22480547-c484-4511-a172-585e6db7c80a.bf7c4.jpg',
      [(403, 158, 78, 84), (406, 7, 134, 136)], True),
@@ -172,7 +173,7 @@ def main():
     frames = 0
     for prefix, source, rects, lum in SEQUENCES:
         for index, rect in enumerate(rects):
-            part = crop(source, [rect], 0)
+            part = crop(source, [rect[:4]], rect[4] if len(rect) > 4 else 0)
             (luminance_to_alpha(part) if lum else part).save(OUT / f'{prefix}_{index}.png')
             frames += 1
     # The game loads WebP (~72% smaller than PNG); the PNGs stay as lossless sources.

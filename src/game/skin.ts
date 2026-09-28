@@ -1,4 +1,4 @@
-import { Assets, Container, Sprite, type Texture } from 'pixi.js'
+import { Assets, Container, Sprite, Texture } from 'pixi.js'
 import type { SymbolId } from './config'
 
 // Sprites sliced from the reference atlases by scripts/extract-skin.py.
@@ -23,7 +23,7 @@ const SKIN_NAMES = [...CORE_NAMES, ...DEFERRED_NAMES] as const
 const DIGIT_KEYS = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'x', 'dot'] as const
 
 /** Effect frame sequences from the reference atlases, in playback order. */
-const SEQUENCE_LENGTHS = { turn: 6, burst: 9, coinspin: 8, plaquefx: 7, hl: 3, hufx: 2, nearmiss: 3 } as const
+const SEQUENCE_LENGTHS = { turn: 6, burst: 9, coinspin: 8, tilefx: 8, hl: 3, hufx: 2, nearmiss: 3 } as const
 
 export type SkinName = (typeof SKIN_NAMES)[number]
 export type DigitKey = (typeof DIGIT_KEYS)[number]
@@ -111,6 +111,25 @@ export function whenDeferredReady(show: () => void) {
 export function skin(): Skin {
   if (!loaded) throw new Error('Skin textures used before loadSkin() resolved')
   return loaded
+}
+
+let softGlow: Texture | undefined
+/** Round soft white glow (radial gradient), generated once; tint it for coloured halos. */
+export function softGlowTexture() {
+  if (!softGlow) {
+    const size = 128
+    const canvas = document.createElement('canvas')
+    canvas.width = canvas.height = size
+    const context = canvas.getContext('2d')!
+    const gradient = context.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2)
+    gradient.addColorStop(0, 'rgba(255,255,255,1)')
+    gradient.addColorStop(.35, 'rgba(255,255,255,.55)')
+    gradient.addColorStop(1, 'rgba(255,255,255,0)')
+    context.fillStyle = gradient
+    context.fillRect(0, 0, size, size)
+    softGlow = Texture.from(canvas)
+  }
+  return softGlow
 }
 
 /** Sprite scaled to fit width (and optionally height), anchored at centre. */

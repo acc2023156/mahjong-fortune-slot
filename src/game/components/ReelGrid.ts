@@ -3,7 +3,7 @@ import {
   PAYING_SYMBOLS, REEL_COLUMNS, REEL_ROWS,
   ReelStrips, SYMBOL_PAYS, multiplierForTumble, type CellState,
 } from '../config'
-import { GLYPHS, skin } from '../skin'
+import { GLYPHS, skin, softGlowTexture } from '../skin'
 
 export type ReelEvent = 'reelStop' | 'scatter' | 'nearMiss' | 'highlight' | 'flip' | 'wild' | 'dropStart' | 'drop'
 
@@ -48,7 +48,10 @@ const NEAR_MISS_MS = 4040
 /** Near-miss reels spin slowly enough to read the tiles. */
 const NEAR_MISS_SPEED = .55
 
-type TileView = Container & { tile: Sprite; aura: Container; rays: Sprite; flame: Sprite; glyph: Sprite; ingot: Sprite; glow: Sprite; frame: Sprite }
+type TileView = Container & {
+  tile: Sprite; aura: Container; halo: Sprite; rays: Sprite; flame: Sprite; glyph: Sprite; ingot: Sprite
+  glow: Sprite; frame: Sprite; twinkles: Container
+}
 
 type WinResult = { payout: number; wins: Set<string> }
 
@@ -155,9 +158,27 @@ export class ReelGrid extends Container {
     view.flame.anchor.set(.5)
     view.flame.blendMode = 'add'
     view.flame.setSize(CELL_WIDTH * 1.25, CELL_HEIGHT * 1.2)
-    view.aura.addChild(view.rays, view.flame)
+    // Bright orange-white halo behind the 胡 (the reference 胡 glows much brighter than its tile row).
+    view.halo = new Sprite(softGlowTexture())
+    view.halo.anchor.set(.5)
+    view.halo.blendMode = 'add'
+    view.halo.tint = 0xffb347
+    view.halo.setSize(CELL_WIDTH * 1.5, CELL_HEIGHT * 1.4)
+    view.aura.addChild(view.halo, view.rays, view.flame)
     view.aura.visible = false
-    view.addChild(view.tile, view.aura, view.ingot, view.glyph, view.glow, view.frame)
+    // WILD: faint white star points twinkling around the lettering and the ingot.
+    view.twinkles = new Container()
+    const spots = [[10, 14], [70, 18], [16, 56], [66, 60], [40, 84], [58, 36]]
+    for (const [x, y] of spots) {
+      const star = new Sprite(skin().star)
+      star.anchor.set(.5)
+      star.blendMode = 'add'
+      star.position.set(x, y)
+      star.scale.set(0)
+      view.twinkles.addChild(star)
+    }
+    view.twinkles.visible = false
+    view.addChild(view.tile, view.aura, view.ingot, view.glyph, view.twinkles, view.glow, view.frame)
     return view
   }
 
@@ -188,6 +209,7 @@ export class ReelGrid extends Container {
     view.tile.visible = state.symbol !== 'wild' && state.symbol !== 'scatter'
     view.ingot.visible = state.symbol === 'wild'
     view.aura.visible = state.symbol === 'scatter'
+    view.twinkles.visible = state.symbol === 'wild'
     if (state.symbol === 'wild') {
       view.glyph.texture = textures.text_wild
       this.fitGlyph(view.glyph, 74, 38, 26)
@@ -559,8 +581,8 @@ export class ReelGrid extends Container {
           view.glyph.scale.x = view.glyph.scale.y * (1 - frame * .14)
           view.glyph.x = CELL_WIDTH / 2 + frame * 3
         }
-        // Ordinary tiles only spray spinning gold coins (the starburst is reserved for gold → WILD).
-        if (fireBurst) this.coinBurst(cx, cy, callbacks.turbo ? 3 : 5)
+        // Ordinary tiles burst into coins in place with a glow on top (reference tilefx frames).
+        if (fireBurst) this.playTileFx(cx, cy, callbacks.turbo)
         view.alpha = t < .6 ? 1 : Math.max(0, 1 - (t - .6) / .25)
       }
     })
@@ -642,10 +664,19 @@ export class ReelGrid extends Container {
   private animateAuras() {
     const tick = (now: number) => {
       for (const column of this.views) for (const view of column) {
+        if (view.twinkles.visible) {
+          view.twinkles.children.forEach((star, index) => {
+            // Each point fades in and out on its own phase, small and subtle.
+            const phase = Math.sin(now / 380 + index * 1.7)
+            star.scale.set(Math.max(0, phase) * .26)
+            star.rotation = now / 900 + index
+          })
+        }
         if (!view.aura.visible) continue
         view.rays.rotation = now / 2600
-        view.rays.alpha = .55 + Math.sin(now / 420) * .2
-        view.flame.alpha = .75 + Math.sin(now / 160) * .12 + Math.sin(now / 67) * .08
+        view.rays.alpha = .75 + Math.sin(now / 420) * .2
+        view.flame.alpha = .95 + Math.sin(now / 160) * .05
+        view.halo.alpha = .8 + Math.sin(now / 300) * .2
       }
       requestAnimationFrame(tick)
     }
@@ -653,26 +684,31 @@ export class ReelGrid extends Container {
   }
 
 
-  /** Spinning gold coins (reference coin-spin frames) thrown out of a cleared tile. */
-  private coinBurst(x: number, y: number, count: number) {
-    const frames = skin().frames.coinspin
-    for (let index = 0; index < count; index++) {
-      const coin = new AnimatedSprite(frames)
-      coin.anchor.set(.5)
-      coin.scale.set((20 + Math.random() * 8) / frames[0].width)
-      coin.animationSpeed = .35 + Math.random() * .2
-      coin.gotoAndPlay(Math.floor(Math.random() * frames.length))
-      coin.position.set(x, y)
-      const vx = (Math.random() - .5) * 5
-      let vy = -4 - Math.random() * 4
-      this.fxLayer.addChild(coin)
-      void this.tween(900, (t) => {
-        vy += .38
-        coin.x += vx
-        coin.y += vy
-        coin.alpha = t < .7 ? 1 : 1 - (t - .7) / .3
-      }).then(() => coin.destroy())
-    }
+  /**
+   * The edge-on tile bursts into coins where it stands (reference tilefx frames, all drawn at
+   * one pixel scale so the tile outline lines up), with a bright glow flash laid over the cell.
+   */
+  private playTileFx(x: number, y: number, turbo: boolean) {
+    const frames = skin().frames.tilefx
+    const burst = new AnimatedSprite(frames)
+    burst.anchor.set(.5)
+    burst.blendMode = 'add'
+    burst.scale.set(CELL_HEIGHT / 300)
+    burst.position.set(x, y)
+    burst.loop = false
+    burst.animationSpeed = turbo ? .5 : .32
+    burst.onComplete = () => burst.destroy()
+    const flash = new Sprite(skin().frames.hl[1])
+    flash.anchor.set(.5)
+    flash.blendMode = 'add'
+    flash.tint = 0xffe070
+    flash.position.set(x, y)
+    this.fxLayer.addChild(flash, burst)
+    burst.play()
+    void this.tween(turbo ? 200 : 380, (t) => {
+      flash.setSize(CELL_WIDTH * (1.05 + t * .35), CELL_HEIGHT * (1.05 + t * .3))
+      flash.alpha = 1 - t
+    }).then(() => flash.destroy())
   }
 
   /** One-shot gold starburst from the reference effect sheet. */

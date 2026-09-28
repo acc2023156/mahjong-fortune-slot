@@ -94,32 +94,54 @@ class WinPlaque extends Container {
     requestAnimationFrame(count)
   }
 
-  /** Payout flash from the reference sheet: the plaque glows orange and bursts coins. */
+  /**
+   * Payout flash (reference, frame-by-frame): the plaque body glows orange-red, a gold starburst
+   * flares at the centre, then small gold coins spray out and fall over ~0.7 s.
+   */
   flash() {
     const glow = new Sprite(skin().frames.hl[2])
     glow.anchor.set(.5)
     glow.tint = 0xff5a1a
     glow.blendMode = 'add'
     glow.setSize(360, 44)
-    const burst = new AnimatedSprite(skin().frames.plaquefx)
-    burst.anchor.set(.5)
-    burst.blendMode = 'add'
-    burst.loop = false
-    burst.animationSpeed = .3
-    burst.setSize(470, 150)
-    burst.onFrameChange = () => burst.setSize(470, 150)
-    burst.onComplete = () => burst.destroy()
-    this.fxLayer.addChild(glow, burst)
-    burst.play()
-    const start = performance.now()
-    const fade = () => {
-      if (glow.destroyed) return
-      const t = Math.min(1, (performance.now() - start) / 900)
-      glow.alpha = t < .2 ? t / .2 : 1 - (t - .2) / .8
-      if (t < 1) requestAnimationFrame(fade)
-      else glow.destroy()
+    const star = new AnimatedSprite(skin().frames.burst)
+    star.anchor.set(.5)
+    star.blendMode = 'add'
+    star.tint = 0xffd060
+    star.scale.set(120 / skin().frames.burst[1].width)
+    star.position.set(20, -8)
+    star.loop = false
+    star.animationSpeed = .45
+    star.onComplete = () => star.destroy()
+    this.fxLayer.addChild(glow, star)
+    star.play()
+    const coins: { sprite: AnimatedSprite; vx: number; vy: number }[] = []
+    for (let index = 0; index < 18; index++) {
+      const sprite = new AnimatedSprite(skin().frames.coinspin)
+      sprite.anchor.set(.5)
+      sprite.scale.set((12 + Math.random() * 8) / skin().frames.coinspin[0].width)
+      sprite.animationSpeed = .4 + Math.random() * .2
+      sprite.gotoAndPlay(Math.floor(Math.random() * 8))
+      sprite.position.set(20 + (Math.random() - .5) * 30, -6)
+      this.fxLayer.addChild(sprite)
+      coins.push({ sprite, vx: (Math.random() - .5) * 9, vy: -3 - Math.random() * 4 })
     }
-    requestAnimationFrame(fade)
+    const start = performance.now()
+    const tick = () => {
+      if (glow.destroyed) return
+      const t = Math.min(1, (performance.now() - start) / 800)
+      glow.alpha = t < .15 ? t / .15 : 1 - (t - .15) / .85
+      for (const coin of coins) {
+        coin.vy += .28
+        coin.sprite.x += coin.vx
+        coin.sprite.y += coin.vy
+        coin.sprite.alpha = t < .6 ? 1 : 1 - (t - .6) / .4
+      }
+      if (t < 1) { requestAnimationFrame(tick); return }
+      glow.destroy()
+      coins.forEach((coin) => coin.sprite.destroy())
+    }
+    requestAnimationFrame(tick)
   }
 
   showFreeRemaining(remaining: number) {
@@ -217,6 +239,8 @@ export class GameScene extends Container {
     })
     this.controls.position.set(0, 620)
     this.addChild(this.controls)
+    // Plaque above the balance row and buttons so its payout coins fall over them (reference).
+    this.addChild(this.plaque)
     this.freePanel.visible = false
     this.addChild(this.freePanel, this.modalLayer)
     this.updateStatus()
