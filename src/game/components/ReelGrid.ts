@@ -1,9 +1,9 @@
 import { AnimatedSprite, BlurFilter, Container, Graphics, Sprite } from 'pixi.js'
 import {
   PAYING_SYMBOLS, REEL_COLUMNS, REEL_ROWS,
-  ReelStrips, SYMBOL_PAYS, multiplierForTumble, type CellState,
+  ReelStrips, SYMBOL_PAYS, multiplierForTumble, type CellState, type PayingSymbolId,
 } from '../config'
-import { GLYPHS, skin, softGlowTexture } from '../skin'
+import { dustDotTexture, GLYPHS, skin, softGlowTexture } from '../skin'
 
 export type ReelEvent = 'reelStop' | 'scatter' | 'nearMiss' | 'highlight' | 'flip' | 'wild' | 'dropStart' | 'drop'
 
@@ -13,7 +13,8 @@ export type ReelSpinCallbacks = {
   settle: () => void
   anticipation: (active: boolean) => void
   /** A winning set is being highlighted, paid at `multiplier`. */
-  tumble: (chain: number, multiplier: number, win: number) => void
+  /** `symbols`: paying symbols in this win, best pay first; `wild`: a WILD took part. */
+  tumble: (chain: number, multiplier: number, win: number, symbols: PayingSymbolId[], wild: boolean) => void
   /** Winners are cleared; the rail advances to the next round's multiplier before the refill. */
   advance: (nextMultiplier: number) => void
   sound: (event: ReelEvent, index?: number) => void
@@ -53,7 +54,7 @@ type TileView = Container & {
   glow: Sprite; frame: Sprite; twinkles: Container
 }
 
-type WinResult = { payout: number; wins: Set<string> }
+type WinResult = { payout: number; wins: Set<string>; symbols: PayingSymbolId[]; wild: boolean }
 
 const easeOutBack = (t: number, overshoot = 1.4) =>
   1 + (overshoot + 1) * Math.pow(t - 1, 3) + overshoot * Math.pow(t - 1, 2)
@@ -441,6 +442,7 @@ export class ReelGrid extends Container {
   private evaluateWays(): WinResult {
     let payout = 0
     const wins = new Set<string>()
+    const symbols: PayingSymbolId[] = []
     for (const target of PAYING_SYMBOLS) {
       const columns: number[][] = []
       for (let col = 0; col < REEL_COLUMNS; col++) {
@@ -453,10 +455,16 @@ export class ReelGrid extends Container {
         const reelCount = Math.min(5, columns.length) as 3 | 4 | 5
         const ways = columns.reduce((total, rows) => total * rows.length, 1)
         payout += ways * SYMBOL_PAYS[target][reelCount] / 20
+        symbols.push(target)
         columns.forEach((rows, col) => rows.forEach((row) => wins.add(`${row}:${col}`)))
       }
     }
-    return { payout, wins }
+    // PAYING_SYMBOLS is ordered by pay, so symbols[0] is the most valuable winning symbol.
+    const wild = [...wins].some((key) => {
+      const [row, col] = key.split(':').map(Number)
+      return this.rowState(row, col).symbol === 'wild'
+    })
+    return { payout, wins, symbols, wild }
   }
 
   // ---------------------------------------------------------------- cascade
@@ -476,7 +484,7 @@ export class ReelGrid extends Container {
       if (!result.wins.size) break
       const multiplier = multiplierForTumble(tumble, callbacks.freeMode)
       total += result.payout * multiplier
-      callbacks.tumble(tumble + 1, multiplier, result.payout * multiplier)
+      callbacks.tumble(tumble + 1, multiplier, result.payout * multiplier, result.symbols, result.wild)
 
       await this.highlightWinners(result.wins, callbacks)
       const converted = await this.clearWinners(result.wins, callbacks)
@@ -582,7 +590,7 @@ export class ReelGrid extends Container {
           view.glyph.x = CELL_WIDTH / 2 + frame * 3
         }
         // Ordinary tiles burst into coins in place with a glow on top (reference tilefx frames).
-        if (fireBurst) this.playTileFx(cx, cy, callbacks.turbo)
+        if (fireBurst) this.goldDust(cx, cy, callbacks.turbo)
         view.alpha = t < .6 ? 1 : Math.max(0, 1 - (t - .6) / .25)
       }
     })
@@ -668,7 +676,7 @@ export class ReelGrid extends Container {
           view.twinkles.children.forEach((star, index) => {
             // Each point fades in and out on its own phase, small and subtle.
             const phase = Math.sin(now / 380 + index * 1.7)
-            star.scale.set(Math.max(0, phase) * .26)
+            star.scale.set(Math.max(0, phase) * .18)
             star.rotation = now / 900 + index
           })
         }
@@ -685,30 +693,41 @@ export class ReelGrid extends Container {
 
 
   /**
-   * The edge-on tile bursts into coins where it stands (reference tilefx frames, all drawn at
-   * one pixel scale so the tile outline lines up), with a bright glow flash laid over the cell.
+   * Cleared tile → a quick glow, then fine gold dust scattered over the emptied felt that
+   * twinkles and fades while the board waits for the refill (reference frame, 2026-09-30).
    */
-  private playTileFx(x: number, y: number, turbo: boolean) {
-    const frames = skin().frames.tilefx
-    const burst = new AnimatedSprite(frames)
-    burst.anchor.set(.5)
-    burst.blendMode = 'add'
-    burst.scale.set(CELL_HEIGHT / 300)
-    burst.position.set(x, y)
-    burst.loop = false
-    burst.animationSpeed = turbo ? .5 : .32
-    burst.onComplete = () => burst.destroy()
-    const flash = new Sprite(skin().frames.hl[1])
+  private goldDust(x: number, y: number, turbo: boolean) {
+    const flash = new Sprite(softGlowTexture())
     flash.anchor.set(.5)
     flash.blendMode = 'add'
     flash.tint = 0xffe070
     flash.position.set(x, y)
-    this.fxLayer.addChild(flash, burst)
-    burst.play()
-    void this.tween(turbo ? 200 : 380, (t) => {
-      flash.setSize(CELL_WIDTH * (1.05 + t * .35), CELL_HEIGHT * (1.05 + t * .3))
-      flash.alpha = 1 - t
+    this.fxLayer.addChild(flash)
+    void this.tween(turbo ? 160 : 300, (t) => {
+      flash.setSize(CELL_WIDTH * (1.1 + t * .5), CELL_HEIGHT * (1.1 + t * .4))
+      flash.alpha = .9 * (1 - t)
     }).then(() => flash.destroy())
+    const count = turbo ? 18 : 40
+    for (let index = 0; index < count; index++) {
+      // Saturated gold dots drawn normally (additive washes out to pale green on the felt).
+      const dot = new Sprite(dustDotTexture())
+      dot.anchor.set(.5)
+      dot.tint = [0xffd21f, 0xffb81a, 0xffe45c][index % 3]
+      const size = 3 + Math.random() * 6
+      dot.setSize(size, size)
+      dot.position.set(x + (Math.random() - .5) * CELL_WIDTH * 1.1, y + (Math.random() - .5) * CELL_HEIGHT * 1.1)
+      const vx = (Math.random() - .5) * .35
+      const vy = -.1 - Math.random() * .25
+      const phase = Math.random() * Math.PI * 2
+      const life = (turbo ? 500 : 1100) + Math.random() * 400
+      this.fxLayer.addChild(dot)
+      void this.tween(life, (t, elapsed) => {
+        dot.x += vx
+        dot.y += vy
+        const twinkle = .65 + .35 * Math.sin(elapsed / 90 + phase)
+        dot.alpha = twinkle * (t < .15 ? t / .15 : 1 - (t - .15) / .85)
+      }).then(() => dot.destroy())
+    }
   }
 
   /** One-shot gold starburst from the reference effect sheet. */

@@ -2,7 +2,7 @@ import { AnimatedSprite, Container, Graphics, Sprite, Text } from 'pixi.js'
 import { BOARD_HEIGHT, ReelGrid } from './components/ReelGrid'
 import { SpinControls } from './components/SpinControls'
 import { StatusPanel } from './components/StatusPanel'
-import { AudioEngine } from './AudioEngine'
+import { AudioEngine, IDLE_LINES } from './AudioEngine'
 import { freeSpinsForScatters, GAME_HEIGHT, GAME_WIDTH } from './config'
 import { skin, skinSprite, SpriteNumber, whenDeferredReady, type SkinName } from './skin'
 
@@ -171,6 +171,7 @@ export class GameScene extends Container {
   private turbo = false
   private auto = false
   private autoTimer: number | undefined
+  private idleTimers: number[] = []
   private freeSpinsRemaining = 0
   private freeGameWin = 0
   private readonly reels = new ReelGrid()
@@ -252,6 +253,20 @@ export class GameScene extends Container {
     this.updateStatus()
   }
 
+  /** Idle banter (VOX_0930): lines at 8/16/…/86 s after the last spin stopped; any spin resets it. */
+  private scheduleIdleVoices() {
+    this.cancelIdleVoices()
+    if (this.auto || this.freeSpinsRemaining > 0) return
+    this.idleTimers = IDLE_LINES.map(([seconds, line]) => window.setTimeout(() => {
+      if (!document.hidden && !this.spinning && this.modalLayer.children.length === 0) this.audio.voice(line)
+    }, seconds * 1000))
+  }
+
+  private cancelIdleVoices() {
+    this.idleTimers.forEach((timer) => clearTimeout(timer))
+    this.idleTimers = []
+  }
+
   private spin() {
     if (this.modalLayer.children.length > 0) return
     const freeMode = this.freeSpinsRemaining > 0
@@ -264,6 +279,7 @@ export class GameScene extends Container {
       return
     }
     this.spinning = true
+    this.cancelIdleVoices()
     this.audio.playMusic(freeMode)
     this.audio.spin()
     if (!freeMode) this.balance -= this.bet
@@ -281,7 +297,10 @@ export class GameScene extends Container {
       anticipation: (active) => {
         if (active) this.plaque.showMessages(['msg_scatter'])
       },
-      tumble: (_chain, multiplier, win) => {
+      tumble: (_chain, multiplier, win, symbols, wild) => {
+        // Voice: a WILD in the win cheers "全中", otherwise the best winning tile is called.
+        if (wild) this.audio.wildCall()
+        else if (symbols[0]) this.audio.cardCall(symbols[0])
         this.setMultiplier(multiplier, freeMode)
         const previous = this.win
         this.win += win * this.bet
@@ -341,6 +360,7 @@ export class GameScene extends Container {
             }
           } else {
             this.scheduleAuto()
+            this.scheduleIdleVoices()
           }
         }
         // Big wins (20x bet and above) get the celebration overlay before play continues.

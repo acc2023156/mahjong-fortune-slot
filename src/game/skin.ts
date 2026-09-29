@@ -132,6 +132,25 @@ export function softGlowTexture() {
   return softGlow
 }
 
+let dotTexture: Texture | undefined
+/** Solid round dot with a soft rim (gold dust particles); tint for colour. */
+export function dustDotTexture() {
+  if (!dotTexture) {
+    const size = 32
+    const canvas = document.createElement('canvas')
+    canvas.width = canvas.height = size
+    const context = canvas.getContext('2d')!
+    const gradient = context.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2)
+    gradient.addColorStop(0, 'rgba(255,255,255,1)')
+    gradient.addColorStop(.6, 'rgba(255,255,255,1)')
+    gradient.addColorStop(1, 'rgba(255,255,255,0)')
+    context.fillStyle = gradient
+    context.fillRect(0, 0, size, size)
+    dotTexture = Texture.from(canvas)
+  }
+  return dotTexture
+}
+
 /** Sprite scaled to fit width (and optionally height), anchored at centre. */
 export function skinSprite(name: SkinName, width?: number, height?: number) {
   const sprite = new Sprite(skin()[name])

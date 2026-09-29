@@ -1,4 +1,18 @@
 import { soundSprites, voiceSprites, type SoundName, type VoiceName } from './audioSprites'
+import type { PayingSymbolId } from './config'
+
+/** VOX_0930 sheet: which call to make for a winning line of each tile. */
+const CARD_CALLS: Record<PayingSymbolId, VoiceName> = {
+  suo2: 'bamboo_two', tong2: 'dots_two', suo5: 'bamboo_five', tong5: 'dots_five',
+  wan8: 'eight', bai: 'white', fa: 'green_dragon', zhong: 'red_dragon',
+}
+
+/** VOX_0930 sheet: idle lines, played this many seconds after the last spin stopped. */
+export const IDLE_LINES: readonly [number, VoiceName][] = [
+  [8, 'look_cards'], [16, 'hurry'], [24, 'request_eat'], [32, 'taunt'], [40, 'ready_hand'],
+  [48, 'hurry_dialect'], [56, 'self_draw'], [64, 'comment_dialect'], [70, 'joke_dialect'],
+  [78, 'long_taunt'], [86, 'final_taunt'],
+]
 
 type Bank = 'general_audio' | 'vox'
 
@@ -18,6 +32,7 @@ export class AudioEngine {
   private activeVoice?: AudioBufferSourceNode
   private readonly looping = new Map<SoundName, AudioBufferSourceNode>()
   private readonly lastPlayed = new Map<SoundName, number>()
+  private wildFemale = true
 
   private getContext() {
     this.context ??= new AudioContext()
@@ -100,6 +115,13 @@ export class AudioEngine {
     if (key in voiceSprites) this.voice(key)
   }
   /** FREE SPINS WON appears (#3, matched at the screen change) with the 胡 call. */
+  /** Winning line call (VOX #8–15): the best-paying symbol of the cascade is announced. */
+  cardCall(symbol: PayingSymbolId) { this.voice(CARD_CALLS[symbol]) }
+  /** WILD took part in a win (VOX #16/#17): female and male "全中" take turns. */
+  wildCall() {
+    this.voice(this.wildFemale ? 'all_match_female' : 'all_match_male')
+    this.wildFemale = !this.wildFemale
+  }
   freeSpinsWon() { this.sound('clickLong'); this.voice('hu') }
   /** START / COLLECT on the feature screens (#36, matched at both presses). */
   confirm() { this.sound('huang') }
