@@ -1,4 +1,4 @@
-import { AnimatedSprite, Container, Graphics, Sprite, Text } from 'pixi.js'
+import { AnimatedSprite, Container, Graphics, Sprite, Text, type Texture } from 'pixi.js'
 import { BOARD_HEIGHT, ReelGrid } from './components/ReelGrid'
 import { SpinControls } from './components/SpinControls'
 import { StatusPanel } from './components/StatusPanel'
@@ -290,15 +290,18 @@ export class GameScene extends Container {
     this.updateStatus()
     this.setMultiplier(freeMode ? 2 : 1, freeMode)
     let railValue = freeMode ? 2 : 1
+    let winHasWild = false
+    const turbo = this.turbo
     this.reels.spin({
       freeMode,
       turbo: this.turbo,
-      settle: () => this.audio.settle(),
+      settle: () => undefined,
       anticipation: (active) => {
         if (active) this.plaque.showMessages(['msg_scatter'])
       },
       tumble: (_chain, multiplier, win, symbols, wild) => {
         // Voice: a WILD in the win cheers "全中", otherwise the best winning tile is called.
+        winHasWild = wild
         if (wild) this.audio.wildCall()
         else if (symbols[0]) this.audio.cardCall(symbols[0])
         this.setMultiplier(multiplier, freeMode)
@@ -311,20 +314,19 @@ export class GameScene extends Container {
         this.setMultiplier(next, freeMode)
         // Rail cue + spoken multiplier only when the value actually steps up (x5 / x10 cap repeats silently).
         if (next !== railValue) {
-          this.audio.multiplier(next)
+          const steps: readonly number[] = freeMode ? FREE_STEPS : BASE_STEPS
+          this.audio.multiplier(next, Math.max(1, Math.min(3, steps.indexOf(next))) as 1 | 2 | 3)
           this.flashRail(next, freeMode)
         }
         railValue = next
       },
       sound: (event, index = 0) => {
-        if (event === 'reelStop') this.audio.reelStop(index)
+        // research/VOX_0930.xlsx: TURBO stops all reels at once with its own cue (#26).
+        if (event === 'reelStop') { if (turbo) this.audio.turboStop(); else this.audio.reelStop(index) }
         else if (event === 'scatter') this.audio.scatter(index)
         else if (event === 'nearMiss') this.audio.nearMiss()
-        else if (event === 'highlight') this.audio.highlight(index)
-        else if (event === 'wild') this.audio.wild()
-        else if (event === 'dropStart') this.audio.dropStart()
-        else if (event === 'drop') this.audio.drop()
-        // 'flip' is covered by the win-highlight cue, which runs through the tile turn.
+        else if (event === 'highlight') this.audio.highlight(index, winHasWild)
+        else if (event === 'flip') this.audio.tileClear()
       },
       complete: (totalWin, scatters) => {
         this.win = totalWin * this.bet
@@ -353,6 +355,7 @@ export class GameScene extends Container {
               this.plaque.showNote(`+${retriggered} FREE SPINS`)
             }
             if (this.freeSpinsRemaining > 0) {
+              this.audio.freeCount(this.freeSpinsRemaining === 1)
               this.updateFreePanel()
               window.setTimeout(() => this.spin(), this.turbo ? 260 : 950)
             } else {
@@ -364,7 +367,14 @@ export class GameScene extends Container {
           }
         }
         // Big wins (20x bet and above) get the celebration overlay before play continues.
-        if (totalWin >= 20) this.showBigWin(this.win, totalWin, afterWin)
+        if (totalWin >= 20) {
+          this.showBigWin(this.win, totalWin, () => {
+            this.plaque.showAmount(this.win, true)
+            this.plaque.flash()
+            this.audio.bigWinReturn()
+            afterWin()
+          })
+        }
         else afterWin()
       },
     })
@@ -463,13 +473,15 @@ export class GameScene extends Container {
     screen.addChild(heading, count, detail)
     this.popIn(heading)
     this.popIn(count)
-    const ring = new Graphics()
+    // Loading ring from the reference sheet (orange→gold ring), turning until START appears.
+    const ring = new Sprite(skin().frames.fsui[1])
+    ring.anchor.set(.5)
+    ring.setSize(56, 56)
     ring.position.set(GAME_WIDTH / 2, 540)
     screen.addChild(ring)
     const spinRing = () => {
       if (ring.destroyed || !ring.visible) return
-      ring.clear().arc(0, 0, 22, 0, Math.PI * 1.5).stroke({ color: '#ffd84a', width: 5, cap: 'round' })
-      ring.rotation += .12
+      ring.rotation += .1
       requestAnimationFrame(spinRing)
     }
     requestAnimationFrame(spinRing)
@@ -477,6 +489,7 @@ export class GameScene extends Container {
       if (ring.destroyed) return
       ring.visible = false
       const start = this.screenButton('label_start', 540, () => {
+        this.audio.button()
         this.closeScreen().then(() => this.enterFreeMode())
       })
       screen.addChild(start)
@@ -489,7 +502,6 @@ export class GameScene extends Container {
     this.freePanel.visible = true
     this.updateFreePanel()
     // The rail relabels left to right: x1→x2, x2→x4, x3→x6, x5→x10.
-    this.audio.railFlip()
     FREE_STEPS.forEach((_, index) => window.setTimeout(() => this.flipRailLabel(index, true), index * 250))
     window.setTimeout(() => this.spin(), FREE_STEPS.length * 250 + 500)
   }
@@ -539,15 +551,15 @@ export class GameScene extends Container {
     this.audio.playMusic(false)
     whenDeferredReady(() => {
       const screen = this.openScreen('gold')
-      const mound = skinSprite('coin_mound', GAME_WIDTH)
+      // Reference layout: title at the top, large amount, the mound's 胡 right under it.
+      const mound = skinSprite('coin_mound', GAME_WIDTH * 1.06)
       mound.anchor.set(.5, 1)
-      // The mound art carries the 胡 on top; lift it so the 胡 sits under the amount.
-      mound.position.set(GAME_WIDTH / 2, GAME_HEIGHT + 150)
-      const heading = skinSprite('title_total_win', 320)
-      heading.position.set(GAME_WIDTH / 2, 120)
-      const amount = new SpriteNumber(76)
+      mound.position.set(GAME_WIDTH / 2, GAME_HEIGHT + 70)
+      const heading = skinSprite('title_total_win', 290)
+      heading.position.set(GAME_WIDTH / 2, 62)
+      const amount = new SpriteNumber(88)
       amount.text = '0.00'
-      amount.position.set(GAME_WIDTH / 2, 220)
+      amount.position.set(GAME_WIDTH / 2, 150)
       screen.addChild(mound, heading, amount)
       this.popIn(heading)
       this.audio.totalWin()
@@ -559,7 +571,8 @@ export class GameScene extends Container {
         amount.text = (total * t).toFixed(2)
         if (t < 1) { requestAnimationFrame(count); return }
         this.audio.totalWinEnd()
-        screen.addChild(this.screenButton('btn_collect', 690, () => {
+        screen.addChild(this.screenButton('btn_collect', 678, () => {
+          this.audio.collect()
           this.closeScreen().then(() => this.exitFreeMode(total))
         }))
       }
@@ -600,15 +613,16 @@ export class GameScene extends Container {
   private screenButton(label: SkinName, y: number, onPress: () => void) {
     const button = new Container()
     button.position.set(GAME_WIDTH / 2, y)
-    button.addChild(new Graphics().roundRect(-88, -28, 176, 56, 12).fill('#b4221c').stroke({ color: '#ffd366', width: 4 }))
-    button.addChild(skinSprite(label, 130))
+    const frame = new Sprite(skin().frames.fsui[0])
+    frame.anchor.set(.5)
+    frame.setSize(190, 72)
+    button.addChild(frame, skinSprite(label, 128))
     button.eventMode = 'static'
     button.cursor = 'pointer'
     let pressed = false
     button.on('pointertap', () => {
       if (pressed) return
       pressed = true
-      this.audio.confirm()
       onPress()
     })
     this.fade(button, 0, 1, 300)
@@ -630,70 +644,196 @@ export class GameScene extends Container {
     })
   }
 
+  /**
+   * Feature-screen backdrop built from the reference sheets: the red light-ray plate, the
+   * sparkle overlay and (TOTAL WIN) the gold glow column with rotating ray fans.
+   */
   private celebrationBackdrop(parent: Container, tone: 'red' | 'gold' = 'red') {
-    const gold = tone === 'gold'
-    parent.addChild(new Graphics().rect(0, 0, GAME_WIDTH, GAME_HEIGHT).fill({ color: gold ? '#e8860f' : '#5e0608', alpha: .96 }))
-    const rays = new Graphics()
-    for (let index = 0; index < 18; index++) {
-      const angle = index / 18 * Math.PI * 2
-      rays.moveTo(0, 0).arc(0, 0, 520, angle, angle + .09).lineTo(0, 0).fill({ color: gold ? '#fff2a0' : '#ffc53a', alpha: gold ? .22 : .1 })
-    }
-    rays.position.set(GAME_WIDTH / 2, gold ? 220 : 300)
-    const glow = new Graphics().circle(0, 0, 170).fill({ color: gold ? '#fff0a0' : '#ffb21f', alpha: gold ? .35 : .22 }).circle(0, 0, 90).fill({ color: '#ffe57a', alpha: .25 })
-    glow.position.set(GAME_WIDTH / 2, gold ? 220 : 300)
-    parent.addChild(rays, glow)
-    if (!gold) {
-      const tiles = skinSprite('flying_tiles', undefined, 700)
-      tiles.position.set(GAME_WIDTH / 2, 330)
-      tiles.alpha = .55
+    const plate = new Sprite(skin().frames.fsbg[0])
+    plate.scale.set(Math.max(GAME_WIDTH / plate.texture.width, GAME_HEIGHT / plate.texture.height))
+    plate.position.set((GAME_WIDTH - plate.width) / 2, 0)
+    const sparkle = new Sprite(skin().frames.fsglow[0])
+    sparkle.blendMode = 'add'
+    sparkle.alpha = .7
+    sparkle.setSize(GAME_WIDTH, GAME_HEIGHT)
+    parent.addChild(plate, sparkle)
+    if (tone === 'gold') {
+      const glow = new Sprite(skin().frames.fsgold[0])
+      glow.blendMode = 'add'
+      glow.setSize(GAME_WIDTH * 1.3, GAME_HEIGHT)
+      glow.position.set(-GAME_WIDTH * .15, -40)
+      parent.addChild(glow, this.rayFans(GAME_WIDTH / 2, 160, 620, .55))
+      const star = new Sprite(skin().frames.fsgold[1])
+      star.anchor.set(.5)
+      star.blendMode = 'add'
+      star.setSize(420, 420)
+      star.position.set(GAME_WIDTH / 2, 150)
+      parent.addChild(star)
+    } else {
+      // Wider than the screen so the art's cut edges stay off-screen.
+      const tiles = skinSprite('flying_tiles', GAME_WIDTH * 1.12)
+      tiles.position.set(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 40)
       parent.addChild(tiles)
     }
-    const spin = () => {
-      if (rays.destroyed) return
-      rays.rotation += .004
-      requestAnimationFrame(spin)
+  }
+
+  /** Full radial light rays from three copies of the reference ray fan, slowly turning. */
+  private rayFans(x: number, y: number, radius: number, alpha: number) {
+    const rays = new Container()
+    rays.position.set(x, y)
+    for (let index = 0; index < 3; index++) {
+      const fan = new Sprite(skin().frames.rays[0])
+      fan.anchor.set(.5, 1)
+      fan.blendMode = 'add'
+      fan.alpha = alpha
+      fan.setSize(radius * 1.16, radius)
+      fan.rotation = index * Math.PI * 2 / 3
+      rays.addChild(fan)
     }
-    requestAnimationFrame(spin)
+    const turn = () => {
+      if (rays.destroyed) return
+      rays.rotation += .0025
+      requestAnimationFrame(turn)
+    }
+    requestAnimationFrame(turn)
+    return rays
   }
 
   private showBigWin(amount: number, betMultiple: number, done: () => void) {
     whenDeferredReady(() => this.presentBigWin(amount, betMultiple, done))
   }
 
+  /**
+   * Big Win (reference screenshots): the board stays visible under a dark veil; radial ray fans,
+   * the gold 壽 ring and the mirrored tile pile sit behind the title and a large gold amount while
+   * coins rain down. The title upgrades BIG → MEGA → SUPER MEGA as the count passes 35× / 60× bet;
+   * MEGA adds the coin pots, SUPER MEGA the ingot stacks. First tap jumps to the final amount,
+   * the next tap (or 1.6 s) closes it.
+   */
   private presentBigWin(amount: number, betMultiple: number, done: () => void) {
     this.modalLayer.removeChildren().forEach((child) => child.destroy({ children: true }))
-    this.celebrationBackdrop(this.modalLayer)
-    const title: SkinName = betMultiple >= 60 ? 'title_super_mega_win' : betMultiple >= 35 ? 'title_mega_win' : 'title_big_win'
-    const heading = skinSprite(title, 330)
-    heading.position.set(GAME_WIDTH / 2, 230)
-    const value = new SpriteNumber(64)
-    value.position.set(GAME_WIDTH / 2, 380)
-    this.modalLayer.addChild(heading, value)
+    const screen = new Container()
+    this.modalLayer.addChild(screen)
+    this.fade(screen, 0, 1, 250)
+    const cx = GAME_WIDTH / 2
+    screen.addChild(new Graphics().rect(0, 0, GAME_WIDTH, GAME_HEIGHT).fill({ color: '#000', alpha: .6 }))
+    screen.addChild(this.rayFans(cx, 330, 560, .22))
+    const [ringTexture, burstTexture] = skin().frames.bwlight
+    const ring = new Sprite(ringTexture)
+    ring.anchor.set(.5)
+    ring.blendMode = 'add'
+    ring.setSize(300, 300)
+    ring.position.set(cx, 340)
+    const burst = new Sprite(burstTexture)
+    burst.anchor.set(.5)
+    burst.blendMode = 'add'
+    burst.setSize(430, 410)
+    burst.position.set(cx, 470)
+    screen.addChild(ring, burst)
+    // Side decorations appear with the tier: coin pots (MEGA), ingot stacks (SUPER MEGA).
+    const [pileTexture, potTexture, ingotTexture] = skin().frames.bwpile
+    const sides: Container[] = []
+    const addPair = (texture: Texture, offset: number, width: number, y: number) => {
+      const pair = new Container()
+      for (const side of [-1, 1]) {
+        const part = new Sprite(texture)
+        part.anchor.set(.5)
+        const scale = width / texture.width
+        part.scale.set(scale * -side, scale)
+        part.position.set(cx + side * offset, y)
+        pair.addChild(part)
+      }
+      pair.visible = false
+      sides.push(pair)
+      screen.addChild(pair)
+    }
+    addPair(potTexture, 118, 124, 350)
+    addPair(ingotTexture, 172, 70, 380)
+    const pile = new Sprite(pileTexture)
+    pile.anchor.set(.5)
+    pile.scale.set(300 / pileTexture.width)
+    pile.position.set(cx, 322)
+    screen.addChild(pile)
+    const titles: SkinName[] = ['title_big_win', 'title_mega_win', 'title_super_mega_win']
+    const tierAt = (value: number) => value >= this.bet * 60 ? 2 : value >= this.bet * 35 ? 1 : 0
+    const finalTier = betMultiple >= 60 ? 2 : betMultiple >= 35 ? 1 : 0
+    const heading = skinSprite(titles[0], 230)
+    heading.position.set(cx, 396)
+    const value = new SpriteNumber(90)
+    value.text = '0.00'
+    value.position.set(cx, 480)
+    screen.addChild(heading, value)
     this.popIn(heading)
     this.audio.bigWin()
-    const duration = this.turbo ? 1200 : 3000
+    let tier = 0
+    const setTier = (next: number) => {
+      if (next <= tier) return
+      tier = next
+      heading.texture = skin()[titles[tier]]
+      heading.scale.set(230 / heading.texture.width)
+      this.popIn(heading)
+      sides.forEach((pair, index) => { pair.visible = index < tier })
+    }
+    // Coins and ingots (motion-blurred reference sprites) rain over the whole screen.
+    const rain = new Container()
+    screen.addChild(rain)
+    const flyers = skin().frames.flycoin
+    const drops: { sprite: Sprite; vy: number; vr: number }[] = []
+    const duration = (this.turbo ? 1500 : 3500) + finalTier * (this.turbo ? 800 : 2000)
     const start = performance.now()
+    let counting = true
     let finished = false
+    let closeTimer: number | undefined
     const finish = () => {
       if (finished) return
       finished = true
+      if (closeTimer !== undefined) clearTimeout(closeTimer)
       this.audio.bigWinEnd()
-      this.modalLayer.removeChildren().forEach((child) => child.destroy({ children: true }))
-      done()
+      this.fade(screen, 1, 0, 250).then(() => {
+        this.modalLayer.removeChildren().forEach((child) => child.destroy({ children: true }))
+        done()
+      })
+    }
+    const endCount = () => {
+      counting = false
+      value.text = amount.toFixed(2)
+      setTier(finalTier)
+      closeTimer = window.setTimeout(finish, 1600)
     }
     const blocker = new Graphics().rect(0, 0, GAME_WIDTH, GAME_HEIGHT).fill({ color: '#000', alpha: .001 })
     blocker.eventMode = 'static'
-    blocker.on('pointertap', finish)
-    this.modalLayer.addChild(blocker)
-    const count = () => {
-      if (finished) return
-      const progress = Math.min(1, (performance.now() - start) / duration)
-      value.text = (amount * (1 - Math.pow(1 - progress, 2))).toFixed(2)
-      if (Math.random() < .35) this.emitCoins(this.modalLayer, 2)
-      if (progress < 1) requestAnimationFrame(count)
-      else window.setTimeout(finish, 900)
+    blocker.cursor = 'pointer'
+    blocker.on('pointertap', () => { if (counting) endCount(); else finish() })
+    screen.addChild(blocker)
+    const tick = (now: number) => {
+      if (screen.destroyed) return
+      if (counting) {
+        const progress = Math.min(1, (now - start) / duration)
+        const shown = amount * (1 - Math.pow(1 - progress, 1.6))
+        value.text = shown.toFixed(2)
+        setTier(tierAt(shown))
+        if (progress >= 1) endCount()
+      }
+      burst.alpha = .75 + Math.sin(now / 160) * .2
+      ring.rotation = now / 9000
+      if (!finished && Math.random() < .12) {
+        const sprite = new Sprite(flyers[Math.floor(Math.random() * flyers.length)])
+        sprite.anchor.set(.5)
+        sprite.scale.set((24 + Math.random() * 22) / 150)
+        sprite.position.set(Math.random() * GAME_WIDTH, -40)
+        sprite.rotation = Math.random() * Math.PI * 2
+        rain.addChild(sprite)
+        drops.push({ sprite, vy: 4 + Math.random() * 5, vr: (Math.random() - .5) * .12 })
+      }
+      for (let index = drops.length - 1; index >= 0; index--) {
+        const drop = drops[index]
+        drop.sprite.y += drop.vy
+        drop.sprite.rotation += drop.vr
+        if (drop.sprite.y > GAME_HEIGHT + 60) { drop.sprite.destroy(); drops.splice(index, 1) }
+      }
+      requestAnimationFrame(tick)
     }
-    requestAnimationFrame(count)
+    requestAnimationFrame(tick)
   }
 
   private popIn(target: Container) {
@@ -708,28 +848,5 @@ export class GameScene extends Container {
       if (progress < 1) requestAnimationFrame(frame)
     }
     requestAnimationFrame(frame)
-  }
-
-  private emitCoins(layer: Container = this.fxLayer, amount = 12) {
-    for (let index = 0; index < amount; index++) {
-      const coin = skinSprite(index % 3 ? 'coin' : 'coin_side', 14 + Math.random() * 12)
-      coin.position.set(40 + Math.random() * 350, layer === this.fxLayer ? 80 + Math.random() * 210 : 250 + Math.random() * 120)
-      layer.addChild(coin)
-      const originY = coin.y
-      const drift = (Math.random() - 0.5) * 80
-      const lift = 60 + Math.random() * 60
-      const start = performance.now()
-      const animate = () => {
-        if (coin.destroyed) return
-        const progress = Math.min(1, (performance.now() - start) / 800)
-        coin.x += drift * 0.018
-        coin.y = originY - Math.sin(progress * Math.PI) * lift + progress * 70
-        coin.alpha = 1 - progress * progress
-        coin.rotation += 0.12
-        if (progress < 1) requestAnimationFrame(animate)
-        else coin.destroy()
-      }
-      requestAnimationFrame(animate)
-    }
   }
 }

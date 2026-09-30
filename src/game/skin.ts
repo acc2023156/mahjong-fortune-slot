@@ -24,10 +24,14 @@ const DIGIT_KEYS = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'x', 'dot'
 
 /** Effect frame sequences from the reference atlases, in playback order. */
 const SEQUENCE_LENGTHS = { turn: 6, burst: 9, coinspin: 8, tilefx: 8, hl: 3, hufx: 2, nearmiss: 3 } as const
+/** Feature-screen (Big Win / Free Spins / Total Win) art from the reference sheets; streamed after start-up. */
+const DEFERRED_SEQUENCE_LENGTHS = {
+  bwpile: 3, bwlight: 3, rays: 1, fsui: 2, flycoin: 10, fsbg: 1, fsglow: 1, fsgold: 2,
+} as const
 
 export type SkinName = (typeof SKIN_NAMES)[number]
 export type DigitKey = (typeof DIGIT_KEYS)[number]
-export type SequenceName = keyof typeof SEQUENCE_LENGTHS
+export type SequenceName = keyof typeof SEQUENCE_LENGTHS | keyof typeof DEFERRED_SEQUENCE_LENGTHS
 
 type Skin = Record<SkinName, Texture> & {
   digits: Record<'gold' | 'silver', Record<DigitKey, Texture>>
@@ -59,7 +63,7 @@ async function loadTexture(file: string, attempts = 3): Promise<Texture> {
 
 /** Every media URL the game needs, for seeding the client cache (see public/sw.js). */
 export function skinUrls() {
-  const sequences = Object.entries(SEQUENCE_LENGTHS) as [SequenceName, number][]
+  const sequences = Object.entries({ ...SEQUENCE_LENGTHS, ...DEFERRED_SEQUENCE_LENGTHS }) as [SequenceName, number][]
   return [
     ...SKIN_NAMES.map((name) => skinFile(name)),
     ...(['gold', 'silver'] as const).flatMap((tint) => DIGIT_KEYS.map((key) => skinFile(`digit_${tint}_${key}`))),
@@ -96,9 +100,14 @@ export async function loadSkin(onProgress?: (progress: number) => void) {
 
 /** Streams the feature-screen textures in the background; safe to call repeatedly. */
 export function loadDeferredSkin() {
-  deferred ??= Promise.all(DEFERRED_NAMES.map(async (name) => {
-    skin()[name] = await loadTexture(name)
-  })).then(() => undefined)
+  deferred ??= Promise.all([
+    ...DEFERRED_NAMES.map(async (name) => {
+      skin()[name] = await loadTexture(name)
+    }),
+    ...(Object.entries(DEFERRED_SEQUENCE_LENGTHS) as [SequenceName, number][]).map(async ([name, length]) => {
+      skin().frames[name] = await Promise.all(Array.from({ length }, (_, index) => loadTexture(`${name}_${index}`)))
+    }),
+  ]).then(() => undefined)
   deferred.catch(() => { deferred = undefined })
   return deferred
 }

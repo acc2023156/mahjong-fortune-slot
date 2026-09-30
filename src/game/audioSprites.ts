@@ -1,49 +1,35 @@
 /**
  * Audio sprite tables, all values [offsetMs, durationMs].
  *
- * general_audio.mp3: boundaries are the measured non-silent regions (−50 dB gate) of each
- * row in the user's sheet (gid 1673875040). Uses were confirmed by matching each region
- * against the reference screen recording (research/video/pg-mahjong ways.mov) and checking
- * the frames at every hit:
- *   ✔ confirmed — repeated hits, all at the same kind of moment
- *   ~ likely    — few or mixed hits
- *   ? guessed   — no reliable hit; used from the sheet label only
+ * general_audio.mp3 uses follow the user's sheet research/VOX_0930.xlsx
+ * (分頁「音效分段時間點與用途明細表」, 2026-09-30): only rows with a written use are wired.
+ * Offsets are the measured non-silent part of each row's time range (−50 dB gate).
+ * Rows without a use yet (#11–14, #16–18, #22–24, #29, #35, #36) are intentionally not listed.
  */
 export const soundSprites = {
-  bigWinMain: [0, 20760], //            #1  ? sheet: BIG WIN MAIN
-  bigWinEnd: [21040, 7850], //          #2  ? sheet: BIG WIN ENDING
-  clickLong: [30060, 2110], //          #3  ~ FREE SPINS WON screen appears
-  coinRoll: [33070, 2190], //           #4  ✔ TOTAL WIN amount starts counting
-  coinRollEnd: [36080, 4720], //        #5  ✔ TOTAL WIN count finished
-  swish: [41110, 780], //               #6  ? 咻
-  wah: [42100, 820], //                 #7  ? 嘩
-  sparkleRise: [43090, 5600], //        #8  ✔ each near-miss reel starts (4 hits, z≈35–41)
-  bright: [49180, 2520], //             #9  ? 清亮
-  button: [52110, 290], //              #10 ✔ button press (with SPIN / Start)
-  promptRise: [53290, 1200], //         #11 ? 提示音
-  drum: [55120, 870], //                #12 ? 鼓聲
-  hollow: [56130, 1990], //             #13 ? 空聲
-  laser: [59130, 480], //               #14 ? 雷射
-  multiplierUp: [60180, 900], //        #15 ✔ multiplier rail steps up after a cascade
-  highlightLight: [62160, 1860], //     #16 ~ plays with #24 when tiles settle
-  rushUp: [65140, 1030], //             #17 ? 往上衝
-  pin: [67150, 1010], //                #18 ~ plays with the SPIN press
-  wildTransform: [69180, 1290], //      #19 ✔ gold tile turns into WILD
-  dropStart: [71170, 1340], //          #20 ~ empty felt → tiles begin to fall
-  dropAlt: [73170, 1550], //            #21 ~ around the drop
-  drumRoll: [75180, 1890], //           #22 ? 督嚕督嚕
-  lightCoins: [77180, 1750], //         #23 ? 燈ㄖ扔錢
-  tilesLand: [79250, 1440], //          #24 ✔ reels settle / refill lands
-  reelSpin: [81180, 1500], //           #25 ? 滾輪滾動
-  stop: [83200, 280], //                #26 ? 停止
-  reelStop: [84190, 150], //            #27 ? 滾輪停止 (very quiet)
-  spinButton: [85210, 570], //          #28 ✔ SPIN press
-  scatterLand: [87440, 1120], //        #30 ✔ 胡 lands
-  metal: [89420, 550], //               #31 ? 金屬
-  winHighlight: [90400, 1010], //       #32 ✔ win highlight → tiles turn into coins
-  railFlip: [93210, 750], //            #34 ~ rail relabels to x2/x4/x6/x10 (sheet said WIN plaque)
-  tong: [94210, 400], //                #35 ? 通
-  huang: [95340, 300], //               #36 ~ START / COLLECT pressed
+  bigWinMain: [0, 20760], //        #1  BIG WIN MAIN
+  bigWinEnd: [21040, 7850], //      #2  BIG WIN ENDING (after MAIN stops, incl. player skip)
+  bigWinReturn: [30060, 2110], //   #3  back from BIG WIN: TOTAL WIN plaque animation
+  countRoll: [33070, 2190], //      #4  FREE SPIN result screen: amount counting
+  countEnd: [36080, 4720], //       #5  FREE SPIN result screen: counting stops
+  freeCount: [41110, 780], //       #6  FREE SPIN remaining count changes
+  freeCountLast: [42100, 820], //   #7  FREE SPIN count changes to the last spin
+  nearMiss: [43090, 5600], //       #8  near miss after two 胡
+  bigWinAppear: [49180, 2520], //   #9  BIG WIN appears (once)
+  button: [52110, 290], //          #10 player presses a button
+  tileClear: [60180, 900], //       #15 winning tiles turn and clear
+  multiplier1: [69180, 1290], //    #19 x1→x2 / free x2→x4
+  multiplier2: [71170, 1340], //    #20 x2→x3 / free x4→x6
+  multiplier3: [73170, 1550], //    #21 x3→x5 / free x6→x10
+  reelSpin: [81180, 1500], //       #25 reels spinning
+  turboStop: [83200, 280], //       #26 TURBO: all reels stop together
+  reelStop: [84190, 150], //        #27 one reel stops (once per reel)
+  spinButton: [85210, 570], //      #28 SPIN button
+  scatterLand: [87440, 1120], //    #30 a single 胡 appears
+  winTurn: [89420, 550], //         #31 winning line: tiles turn into coins
+  wildWinTurn: [90400, 1010], //    #32 winning line with WILD: tiles turn into coins
+  uiClick: [91930, 260], //         #33 UI button click (sheet range; measures near-silent)
+  collect: [93210, 750], //         #34 FREE SPIN result: COLLECT pressed
 } as const
 
 // vox.mp3 timings as corrected by the user on 2026-09-25 (from the MJW prototype).

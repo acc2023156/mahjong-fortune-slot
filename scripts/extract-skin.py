@@ -131,6 +131,23 @@ SEQUENCES = [
     # Near-miss reel: thin gold frame, yellow light column, thin edge glow.
     ('nearmiss', FX_A + 'cb72e539-e2b7-41ce-9cac-e8e7c5e041e9.6bbc2.jpg',
      [(235, 280, 52, 324), (85, 345, 136, 286), (279, 604, 35, 254)], True),
+    # Big Win centrepiece: the tile pile (stored rotated 90° in the atlas), coin pot, ingot stack.
+    ('bwpile', FX_A + 'b3d2d99f-2401-4463-bc7d-d0d3b140e63a.d6feb.png',
+     [(0, 10, 315, 565, 90), (0, 575, 220, 215), (220, 583, 131, 130)], False),
+    # Big Win lights: 壽 emblem ring, radial starburst, vertical flare.
+    ('bwlight', FX_A + 'd93409b8-c5a8-48fa-996f-fe3c9c2c4bd0.1c5e7.jpg',
+     [(19, 1, 502, 505), (576, 21, 472, 454), (1123, 3, 237, 541)], True),
+    # Light-ray fan (three copies make the full radial rays).
+    ('rays', FX_A + '606fb525-cdd0-4d4d-a030-76c97d12d3d3.3c2c6.jpg', [(0, 4, 544, 469)], True),
+    # Feature-screen parts: red/gold button frame, loading ring, and motion-blurred flying coins/ingots.
+    ('fsui', FX_A + '03ad56a3-4bda-4204-9d2c-37ed4d38e249.ffa25.png', [(0, 1432, 386, 147), (388, 1438, 226, 226)], False),
+    ('flycoin', FX_A + '03ad56a3-4bda-4204-9d2c-37ed4d38e249.ffa25.png',
+     [(160, 0, 147, 123), (646, 229, 112, 123), (292, 323, 71, 128), (0, 512, 110, 194), (548, 554, 180, 159),
+      (222, 716, 147, 115), (457, 880, 107, 141), (107, 1029, 159, 109), (19, 1158, 218, 214), (511, 1294, 67, 138)], False),
+    # Feature-screen backgrounds: red light-ray plate (opaque), sparkle overlay, gold glow column, star glow.
+    ('fsbg', FX_A + '5fd32d05-04eb-4bfc-8c69-b5a44d782a47.066b7.jpg', [(758, 0, 758, 1647)], False),
+    ('fsglow', FX_A + '5fd32d05-04eb-4bfc-8c69-b5a44d782a47.066b7.jpg', [(0, 0, 758, 1647)], True),
+    ('fsgold', FX_A + 'e3b87b24-a5b2-4b24-bb54-ec4684374f6e.a429d.jpg', [(0, 0, 326, 709), (32, 732, 260, 264)], True),
     # Win highlight: gold outline frame and inner glow around a tile.
     ('hl', FX_A + '2ada7886-83e0-4d3c-b651-eae6ad6b5c7a.22e5d.jpg',
      [(165, 13, 78, 81), (260, 2, 72, 76), (34, 150, 172, 68)], True),

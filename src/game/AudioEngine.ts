@@ -19,7 +19,7 @@ type Bank = 'general_audio' | 'vox'
 const audioUrl = (file: string) => `${import.meta.env.BASE_URL}assets/pgsoft-reference/audio/audio/mp3/${file}`
 
 /** Minimum gap between repeats of one cue; the reference plays one landing cue per settle. */
-const THROTTLE_MS: Partial<Record<SoundName, number>> = { tilesLand: 700, reelStop: 70 }
+const THROTTLE_MS: Partial<Record<SoundName, number>> = { reelStop: 70, turboStop: 250, tileClear: 400 }
 
 /**
  * Plays the original audio sprites (general_audio.mp3 / vox.mp3) via Web Audio and the
@@ -96,25 +96,23 @@ export class AudioEngine {
   /** Decode both banks early (after the first user gesture) so the first cues are not dropped. */
   warmUp() { void this.load('general_audio'); void this.load('vox') }
 
-  // --- game events -------------------------------------------------------------------------
+  // --- game events (research/VOX_0930.xlsx) ---------------------------------------------
   spin() { this.sound('spinButton'); this.sound('reelSpin', .5) }
   button() { this.sound('button') }
+  uiClick() { this.sound('uiClick') }
   reelStop(_col: number) { this.sound('reelStop') }
-  settle() { this.sound('tilesLand') }
+  turboStop() { this.sound('turboStop') }
   scatter(_col: number) { this.sound('scatterLand') }
-  /** Rising glissando at the start of every near-miss reel (4.04 s apart in the reference). */
-  nearMiss() { this.sound('sparkleRise', .8) }
-  /** Winners light up column by column; the original cue starts with the first column. */
-  highlight(col: number) { if (col === 0) this.sound('winHighlight') }
-  wild() { this.sound('wildTransform') }
-  dropStart() { this.sound('dropStart', .6) }
-  drop() { this.sound('tilesLand', .6) }
-  multiplier(value: number) {
-    this.sound('multiplierUp')
+  nearMiss() { this.sound('nearMiss', .8) }
+  /** Winners light up (column 0 first): turn-into-coins cue, the WILD variant when a WILD wins. */
+  highlight(col: number, wild: boolean) { if (col === 0) this.sound(wild ? 'wildWinTurn' : 'winTurn') }
+  tileClear() { this.sound('tileClear') }
+  /** Rail step cue by level (#19/#20/#21) plus the spoken multiplier. */
+  multiplier(value: number, level: 1 | 2 | 3) {
+    this.sound(level === 1 ? 'multiplier1' : level === 2 ? 'multiplier2' : 'multiplier3')
     const key = `multiplier_${value}` as VoiceName
     if (key in voiceSprites) this.voice(key)
   }
-  /** FREE SPINS WON appears (#3, matched at the screen change) with the 胡 call. */
   /** Winning line call (VOX #8–15): the best-paying symbol of the cascade is announced. */
   cardCall(symbol: PayingSymbolId) { this.voice(CARD_CALLS[symbol]) }
   /** WILD took part in a win (VOX #16/#17): female and male "全中" take turns. */
@@ -122,16 +120,14 @@ export class AudioEngine {
     this.voice(this.wildFemale ? 'all_match_female' : 'all_match_male')
     this.wildFemale = !this.wildFemale
   }
-  freeSpinsWon() { this.sound('clickLong'); this.voice('hu') }
-  /** START / COLLECT on the feature screens (#36, matched at both presses). */
-  confirm() { this.sound('huang') }
-  /** Rail relabels to the free-game multipliers (#34, matched at the flip). */
-  railFlip() { this.sound('railFlip') }
-  /** TOTAL WIN count-up (#4) and its end (#5), both matched against the reference. */
-  totalWin() { this.sound('coinRoll') }
-  totalWinEnd() { this.sound('coinRollEnd') }
-  bigWin() { this.held('bigWinMain', .8) }
+  freeSpinsWon() { this.voice('hu') }
+  freeCount(last: boolean) { this.sound(last ? 'freeCountLast' : 'freeCount') }
+  totalWin() { this.sound('countRoll') }
+  totalWinEnd() { this.sound('countEnd') }
+  collect() { this.sound('collect') }
+  bigWin() { this.sound('bigWinAppear', .8); this.held('bigWinMain', .8) }
   bigWinEnd() { this.stop('bigWinMain'); this.sound('bigWinEnd', .8) }
+  bigWinReturn() { this.sound('bigWinReturn') }
 
   playMusic(freeMode = false) {
     this.warmUp()
