@@ -46,6 +46,27 @@ await app.init({
 
 const mount = document.querySelector<HTMLDivElement>('#app')!
 mount.appendChild(app.canvas)
+
+let scene: GameScene | undefined
+/**
+ * Never stretch the 430-wide design. Tall screens get a taller logical canvas (the scene lays
+ * the extra height out itself); wider screens letterbox the 430×760 design.
+ */
+const fitCanvas = () => {
+  const viewport = window.visualViewport
+  const width = viewport?.width ?? window.innerWidth
+  const height = viewport?.height ?? window.innerHeight
+  const tall = height / width >= GAME_HEIGHT / GAME_WIDTH
+  const logicalHeight = tall ? Math.round(GAME_WIDTH * height / width) : GAME_HEIGHT
+  mount.style.width = `${Math.round(tall ? width : height * GAME_WIDTH / GAME_HEIGHT)}px`
+  mount.style.height = `${Math.round(height)}px`
+  if (app.renderer.height !== logicalHeight) app.renderer.resize(GAME_WIDTH, logicalHeight)
+  scene?.setViewHeight(logicalHeight)
+}
+fitCanvas()
+window.addEventListener('resize', fitCanvas, { passive: true })
+window.addEventListener('orientationchange', fitCanvas, { passive: true })
+window.visualViewport?.addEventListener('resize', fitCanvas, { passive: true })
 // First visits download ~160 textures; show progress instead of a blank board.
 const loading = document.createElement('div')
 loading.style.cssText = 'position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);color:#ffe36e;font:700 16px Arial,sans-serif;letter-spacing:1px;text-shadow:0 2px 4px #0008'
@@ -54,10 +75,11 @@ mount.appendChild(loading)
 try {
   await loadSkin((progress) => { loading.textContent = `LOADING ${Math.round(progress * 100)}%` })
   loading.remove()
-  const scene = new GameScene()
+  scene = new GameScene()
   app.stage.addChild(scene)
+  fitCanvas()
   // Dev-only handle for QA in the browser console (stripped from production builds).
-  if (import.meta.env.DEV) Object.assign(window, { __slot: scene })
+  if (import.meta.env.DEV) Object.assign(window, { __slot: scene, __app: app })
   createFeatureCenter(mount)
   const help = createHelpPage()
   scene.onHelp = help.open

@@ -29,13 +29,17 @@ export class SpinControls extends Container {
     const turbo = this.iconButton(56, actions.toggleTurbo)
     this.turboRing = turbo.ring
     this.turboIcon = skinSprite('icon_turbo_off', 30)
+    // The atlas bolt faces the wrong way; mirror it to match the reference TURBO icon.
+    this.turboIcon.scale.x *= -1
     turbo.button.addChild(this.turboIcon)
 
-    const minus = this.iconButton(128, actions.decreaseBet)
+    // −/+ sit symmetrically around the SPIN ring with an equal ~7px gap on both sides.
+    const minus = this.iconButton(124, actions.decreaseBet)
     minus.button.addChild(new Graphics().roundRect(-10, -1.8, 20, 3.6, 1.8).fill('#f2dcc0'))
 
     this.spinFace = skinSprite('spin_round', 147)
-    this.spinFace.anchor.set(.587, .49)
+    // Anchor on the gold ring's centre (the art carries a drop shadow on its right side).
+    this.spinFace.anchor.set(.577, .49)
     this.spinArrows = skinSprite('spin_arrows', 70)
     this.counter.visible = false
     this.spinButton.position.set(215, ROW_Y)
@@ -43,7 +47,7 @@ export class SpinControls extends Container {
     this.activate(this.spinButton, actions.spin)
     this.addChild(this.spinButton)
 
-    const plus = this.iconButton(302, actions.increaseBet)
+    const plus = this.iconButton(306, actions.increaseBet)
     plus.button.addChild(skinSprite('icon_plus', 20))
 
     const auto = this.iconButton(374, actions.toggleAuto)
@@ -104,7 +108,8 @@ export class SpinControls extends Container {
 
   setTurbo(active: boolean) {
     this.turboIcon.texture = skin()[active ? 'icon_turbo_on' : 'icon_turbo_off']
-    this.turboIcon.scale.set((active ? 22 : 30) / this.turboIcon.texture.width)
+    const size = (active ? 22 : 30) / this.turboIcon.texture.width
+    this.turboIcon.scale.set(-size, size)
     this.turboIcon.tint = active ? 0xffe066 : 0xffffff
     this.paintRing(this.turboRing, active)
   }

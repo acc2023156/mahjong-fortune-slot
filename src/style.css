@@ -32,6 +32,7 @@ body::after {
   position: relative;
   z-index: 1;
   flex: 0 0 auto;
+  /* Size is set by fitCanvas() in main.ts (never stretched); this is the pre-script fallback. */
   width: min(var(--viewport-width), calc(var(--viewport-height) * 430 / 760));
   aspect-ratio: 430 / 760;
   background: linear-gradient(180deg, rgba(114, 21, 23, .96), rgba(151, 55, 30, .98));
@@ -63,16 +64,14 @@ body::after {
     width: var(--viewport-width);
     height: var(--viewport-height);
     align-items: flex-start;
-    justify-content: flex-start;
+    justify-content: center;
     background: #7d201d;
   }
 
   body::after { display: none; }
 
   #app {
-    width: var(--viewport-width);
-    height: var(--viewport-height);
-    aspect-ratio: auto;
+    margin: 0 auto;
     box-shadow: none;
   }
 }

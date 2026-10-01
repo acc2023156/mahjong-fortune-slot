@@ -230,6 +230,9 @@ export class GameScene extends Container {
   onHelp?: () => void
   /** Replaces the balance row and buttons during Free Spins (reference: large REMAINING panel). */
   private readonly freePanel = new Container()
+  private readonly panel: Sprite
+  /** Extra height above/below the 430×760 design used by full-screen feature screens. */
+  private modalPad = 0
 
   constructor() {
     super()
@@ -240,6 +243,7 @@ export class GameScene extends Container {
     const panel = new Sprite(textures.panel_wood)
     panel.scale.set(GAME_WIDTH / panel.texture.width)
     panel.y = BOARD_Y + BOARD_HEIGHT - 8
+    this.panel = panel
     this.addChild(header, panel)
 
     const waysBar = new Sprite(textures.bar_ways)
@@ -302,6 +306,23 @@ export class GameScene extends Container {
     this.freePanel.visible = false
     this.addChild(this.freePanel, this.modalLayer)
     this.updateStatus()
+  }
+
+  /**
+   * Tall phones: the logical canvas stays 430 wide and grows taller instead of being stretched.
+   * Reels, plaque and the SPIN row keep their size; the extra height goes to the red header
+   * (top), the space above the SPIN row and the wood panel below it.
+   */
+  setViewHeight(height: number) {
+    const extra = Math.max(0, height - GAME_HEIGHT)
+    const top = Math.min(140, Math.round(extra * .35))
+    const lower = Math.round((extra - top) * .45)
+    this.y = top
+    this.controls.y = 620 + lower
+    this.freePanel.y = lower
+    this.panel.height = GAME_HEIGHT + extra - top - this.panel.y + 4
+    this.modalPad = Math.round(extra / 2)
+    this.modalLayer.y = this.modalPad - top
   }
 
   private changeBet(amount: number) {
@@ -710,12 +731,14 @@ export class GameScene extends Container {
    */
   private celebrationBackdrop(parent: Container, tone: 'red' | 'gold' = 'red') {
     const plate = new Sprite(skin().frames.fsbg[0])
-    plate.scale.set(Math.max(GAME_WIDTH / plate.texture.width, GAME_HEIGHT / plate.texture.height))
-    plate.position.set((GAME_WIDTH - plate.width) / 2, 0)
+    const fullHeight = GAME_HEIGHT + this.modalPad * 2
+    plate.scale.set(Math.max(GAME_WIDTH / plate.texture.width, fullHeight / plate.texture.height))
+    plate.position.set((GAME_WIDTH - plate.width) / 2, -this.modalPad)
     const sparkle = new Sprite(skin().frames.fsglow[0])
     sparkle.blendMode = 'add'
     sparkle.alpha = .7
-    sparkle.setSize(GAME_WIDTH, GAME_HEIGHT)
+    sparkle.setSize(GAME_WIDTH, fullHeight)
+    sparkle.y = -this.modalPad
     parent.addChild(plate, sparkle)
     if (tone === 'gold') {
       const glow = new Sprite(skin().frames.fsgold[0])
@@ -776,7 +799,7 @@ export class GameScene extends Container {
     this.modalLayer.addChild(screen)
     this.fade(screen, 0, 1, 250)
     const cx = GAME_WIDTH / 2
-    screen.addChild(new Graphics().rect(0, 0, GAME_WIDTH, GAME_HEIGHT).fill({ color: '#000', alpha: .6 }))
+    screen.addChild(new Graphics().rect(0, -this.modalPad, GAME_WIDTH, GAME_HEIGHT + this.modalPad * 2).fill({ color: '#000', alpha: .6 }))
     screen.addChild(this.rayFans(cx, 330, 560, .22))
     const [ringTexture, burstTexture] = skin().frames.bwlight
     const ring = new Sprite(ringTexture)
@@ -861,7 +884,7 @@ export class GameScene extends Container {
       setTier(finalTier)
       closeTimer = window.setTimeout(finish, 1600)
     }
-    const blocker = new Graphics().rect(0, 0, GAME_WIDTH, GAME_HEIGHT).fill({ color: '#000', alpha: .001 })
+    const blocker = new Graphics().rect(0, -this.modalPad, GAME_WIDTH, GAME_HEIGHT + this.modalPad * 2).fill({ color: '#000', alpha: .001 })
     blocker.eventMode = 'static'
     blocker.cursor = 'pointer'
     blocker.on('pointertap', () => { if (counting) endCount(); else finish() })
@@ -881,7 +904,7 @@ export class GameScene extends Container {
         const sprite = new Sprite(flyers[Math.floor(Math.random() * flyers.length)])
         sprite.anchor.set(.5)
         sprite.scale.set((24 + Math.random() * 22) / 150)
-        sprite.position.set(Math.random() * GAME_WIDTH, -40)
+        sprite.position.set(Math.random() * GAME_WIDTH, -this.modalPad - 40)
         sprite.rotation = Math.random() * Math.PI * 2
         rain.addChild(sprite)
         drops.push({ sprite, vy: 4 + Math.random() * 5, vr: (Math.random() - .5) * .12 })
@@ -890,7 +913,7 @@ export class GameScene extends Container {
         const drop = drops[index]
         drop.sprite.y += drop.vy
         drop.sprite.rotation += drop.vr
-        if (drop.sprite.y > GAME_HEIGHT + 60) { drop.sprite.destroy(); drops.splice(index, 1) }
+        if (drop.sprite.y > GAME_HEIGHT + this.modalPad + 60) { drop.sprite.destroy(); drops.splice(index, 1) }
       }
       requestAnimationFrame(tick)
     }
