@@ -130,7 +130,11 @@ SEQUENCES = [
      [(403, 158, 78, 84), (406, 7, 134, 136)], True),
     # Near-miss reel: thin gold frame, yellow light column, thin edge glow.
     ('nearmiss', FX_A + 'cb72e539-e2b7-41ce-9cac-e8e7c5e041e9.6bbc2.jpg',
-     [(235, 280, 52, 324), (85, 345, 136, 286), (279, 604, 35, 254)], True),
+     [(235, 280, 52, 324), (85, 345, 136, 286), (279, 604, 35, 254),
+      # 3: vertical star flare, 4: radial speed lines
+      (99, 19, 113, 240), (8, 41, 62, 253)], True),
+    # Near-miss reel edge: tall orange light column with a star core (reference near miss01).
+    ('nmflare', FX_A + 'f3db3462-ca16-4892-872b-09b04c92467f.2f73f.jpg', [(28, 294, 229, 336)], True),
     # Big Win centrepiece: the tile pile (stored rotated 90° in the atlas), coin pot, ingot stack.
     ('bwpile', FX_A + 'b3d2d99f-2401-4463-bc7d-d0d3b140e63a.d6feb.png',
      [(0, 10, 315, 565, 90), (0, 575, 220, 215), (220, 583, 131, 130)], False),

@@ -52,6 +52,7 @@ const NEAR_MISS_SPEED = .55
 type TileView = Container & {
   tile: Sprite; aura: Container; halo: Sprite; rays: Sprite; flame: Sprite; glyph: Sprite; ingot: Sprite
   glow: Sprite; frame: Sprite; twinkles: Container
+  nearMissBoost?: boolean
 }
 
 type WinResult = { payout: number; wins: Set<string>; symbols: PayingSymbolId[]; wild: boolean }
@@ -350,15 +351,16 @@ export class ReelGrid extends Container {
       const slot = row + 1
       const x = this.baseX(col) + CELL_WIDTH / 2
       const y = this.rowY(row) + CELL_HEIGHT / 2
-      const flare = new Sprite(skin().frames.hl[2])
+      // Round orange bloom (the rectangular hl glow showed hard square edges here).
+      const flare = new Sprite(softGlowTexture())
       flare.anchor.set(.5)
-      flare.tint = 0xff7a1a
+      flare.tint = 0xff8a2a
       flare.blendMode = 'add'
       flare.position.set(x, y)
       this.fxLayer.addChild(flare)
       this.playBurst(x, y, 130, 0xffa640)
       this.tween(callbacks.turbo ? 260 : 520, (t) => {
-        flare.setSize(120 + t * 60, 70 + t * 40)
+        flare.setSize(130 + t * 90, 130 + t * 90)
         flare.alpha = 1 - t
         const pop = 1 + Math.sin(t * Math.PI) * .22
         this.place(col, slot, this.slotY(slot), pop)
@@ -366,68 +368,138 @@ export class ReelGrid extends Container {
     }
   }
 
-  /** Near-miss reel overlay from the reference sheet: thin gold frame, light column, edge glows, gold dust. */
+  /**
+   * Near-miss reel (reference near miss01.mp4), all from the original effect sheets:
+   * the active reel is washed bright, tall orange light columns with star cores stand on both
+   * edges, yellow speed streaks race down the reel, and gold sparks spray left and right
+   * from the edges.
+   */
   private buildNearMiss() {
-    const [frame, column, edge] = skin().frames.nearmiss
-    const light = new Sprite(column)
-    light.anchor.set(.5)
-    light.blendMode = 'add'
-    light.alpha = .28
-    light.setSize(CELL_WIDTH * 1.2, BOARD_HEIGHT)
-    light.position.set(CELL_WIDTH / 2, BOARD_HEIGHT / 2)
+    const [frame, streak, edge, starColumn, radial] = skin().frames.nearmiss
+    const wash = new Graphics().rect(0, 0, CELL_WIDTH, BOARD_HEIGHT).fill('#fff4c8')
+    wash.blendMode = 'add'
+    wash.alpha = .08
+    // Speed streaks: two stacked copies scroll downward continuously.
+    const streaks = [0, 1].map(() => {
+      const sprite = new Sprite(streak)
+      sprite.anchor.set(.5, 0)
+      sprite.blendMode = 'add'
+      sprite.setSize(CELL_WIDTH * 1.1, BOARD_HEIGHT)
+      sprite.x = CELL_WIDTH / 2
+      return sprite
+    })
+    const radialLines = new Sprite(radial)
+    radialLines.anchor.set(.5)
+    radialLines.blendMode = 'add'
+    radialLines.setSize(CELL_WIDTH, BOARD_HEIGHT)
+    radialLines.position.set(CELL_WIDTH / 2, BOARD_HEIGHT / 2)
     const border = new Sprite(frame)
     border.anchor.set(.5)
     border.blendMode = 'add'
     border.setSize(CELL_WIDTH + 12, BOARD_HEIGHT + 30)
     border.position.set(CELL_WIDTH / 2, BOARD_HEIGHT / 2)
-    const edges = [-4, CELL_WIDTH + 4].map((x) => {
+    // Edge light columns: the orange flare with a star core plus the thin edge glow.
+    const flares = [-2, CELL_WIDTH + 2].map((x) => {
+      const column = new Container()
+      column.position.set(x, BOARD_HEIGHT / 2)
+      const flare = new Sprite(skin().frames.nmflare[0])
+      flare.anchor.set(.5)
+      flare.blendMode = 'add'
+      flare.setSize(40, BOARD_HEIGHT * 1.05)
+      const core = new Sprite(starColumn)
+      core.anchor.set(.5)
+      core.blendMode = 'add'
+      core.setSize(30, BOARD_HEIGHT * .9)
       const glow = new Sprite(edge)
       glow.anchor.set(.5)
       glow.blendMode = 'add'
       glow.setSize(22, BOARD_HEIGHT + 20)
-      glow.position.set(x, BOARD_HEIGHT / 2)
-      return glow
+      column.addChild(flare, core, glow)
+      return column
     })
-    this.nearMissLayer.addChild(light, border, ...edges)
-    const dust: Sprite[] = []
-    for (let index = 0; index < 14; index++) {
-      const mote = new Sprite(skin().star)
-      mote.anchor.set(.5)
-      mote.blendMode = 'add'
-      mote.tint = 0xffc437
-      mote.position.set(Math.random() * CELL_WIDTH, Math.random() * BOARD_HEIGHT)
-      dust.push(mote)
-      this.nearMissLayer.addChild(mote)
-    }
+    this.nearMissLayer.addChild(wash, ...streaks, radialLines, border, ...flares)
+    // Gold sparks shoot sideways out of both edge columns.
+    const sparks: { sprite: Sprite; vx: number; vy: number; life: number; age: number }[] = []
+    const sparkLayer = new Container()
+    this.nearMissLayer.addChild(sparkLayer)
+    let offset = 0
+    let last = performance.now()
     const tick = (now: number) => {
+      const dt = Math.min(50, now - last)
+      last = now
       if (this.nearMissLayer.visible) {
-        const pulse = .8 + Math.sin(now / 140) * .2
+        offset = (offset + dt * .9) % BOARD_HEIGHT
+        streaks[0].y = offset - BOARD_HEIGHT
+        streaks[1].y = offset
+        streaks.forEach((sprite) => { sprite.alpha = .22 + Math.sin(now / 90) * .06 })
+        radialLines.alpha = .18 + Math.sin(now / 120) * .07
+        const pulse = .85 + Math.sin(now / 110) * .15
         border.alpha = pulse
-        edges.forEach((glow) => { glow.alpha = pulse })
-        light.alpha = .22 + Math.sin(now / 260) * .08
-        dust.forEach((mote, index) => {
-          mote.y += .55 + (index % 3) * .25
-          if (mote.y > BOARD_HEIGHT) { mote.y = -10; mote.x = Math.random() * CELL_WIDTH }
-          mote.scale.set(.06 + .05 * Math.abs(Math.sin(now / 200 + index)))
+        flares.forEach((column, index) => {
+          column.alpha = pulse * .8
+          column.scale.x = 1 + Math.sin(now / 75 + index) * .12
         })
+        wash.alpha = .07 + Math.sin(now / 200) * .02
+        for (let index = 0; index < 2; index++) {
+          const fromLeft = Math.random() < .5
+          const sprite = new Sprite(skin().star)
+          sprite.anchor.set(.5)
+          sprite.blendMode = 'add'
+          sprite.tint = Math.random() < .5 ? 0xffd34a : 0xff9a2a
+          sprite.position.set(fromLeft ? -2 : CELL_WIDTH + 2, Math.random() * BOARD_HEIGHT)
+          sparkLayer.addChild(sprite)
+          sparks.push({ sprite, vx: (fromLeft ? -1 : 1) * (1.2 + Math.random() * 2.4), vy: (Math.random() - .5) * 1.4, life: 500 + Math.random() * 500, age: 0 })
+        }
+      }
+      for (let index = sparks.length - 1; index >= 0; index--) {
+        const spark = sparks[index]
+        spark.age += dt
+        spark.sprite.x += spark.vx
+        spark.sprite.y += spark.vy
+        const t = spark.age / spark.life
+        spark.sprite.scale.set(.09 * (1 - t) + .02)
+        spark.sprite.alpha = 1 - t
+        if (t >= 1 || !this.nearMissLayer.visible) {
+          spark.sprite.destroy()
+          sparks.splice(index, 1)
+        }
       }
       requestAnimationFrame(tick)
     }
     requestAnimationFrame(tick)
   }
 
-  /** Stopped reels go dark (胡 stay lit); the near-miss reel is framed and spins slowly. */
+  /**
+   * Stopped reels go dark while every landed 胡 stays lit and glows much larger (reference);
+   * the near-miss reel is framed and spins slowly.
+   */
   private showNearMiss(activeColumn: number) {
     this.nearMissLayer.x = this.baseX(activeColumn)
     this.nearMissLayer.visible = true
     this.blurs[activeColumn].strengthY = 3
     for (let col = 0; col < activeColumn; col++) for (let slot = 0; slot < SLOTS; slot++) {
-      this.views[col][slot].tint = this.states[col][slot].symbol === 'scatter' ? 0xffffff : DIM_TINT
+      const scatter = this.states[col][slot].symbol === 'scatter'
+      this.views[col][slot].tint = scatter ? 0xffffff : DIM_TINT
+      if (scatter) {
+        // Only the round halo and rays grow; the flame art has a square JPG edge when enlarged.
+        const view = this.views[col][slot]
+        view.halo.scale.set(view.halo.scale.x * 1.6, view.halo.scale.y * 1.6)
+        view.rays.scale.set(view.rays.scale.x * 1.4, view.rays.scale.y * 1.4)
+        view.nearMissBoost = true
+        this.reelLayer.addChild(this.views[col][slot])
+      }
     }
   }
 
   private async hideNearMiss(fadeMs: number) {
     this.nearMissLayer.visible = false
+    for (const column of this.views) for (const view of column) {
+      if (!view.nearMissBoost) continue
+      view.nearMissBoost = false
+      view.halo.scale.set(view.halo.scale.x / 1.6, view.halo.scale.y / 1.6)
+      view.rays.scale.set(view.rays.scale.x / 1.4, view.rays.scale.y / 1.4)
+    }
+    this.restoreLayering()
     const dimmed = this.views.flat().filter((view) => view.tint !== 0xffffff)
     if (fadeMs > 0 && dimmed.length) {
       const from = DIM_TINT & 0xff

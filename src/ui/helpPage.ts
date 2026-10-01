@@ -32,7 +32,7 @@ const waysGrid = (rows: number[][], ok: boolean) => `<div class="hp-ways ${ok ? 
 
 const paytablePage = `
   <section>
-    <h3>3.1 符號賠付</h3>
+    <h3>符號賠付</h3>
     <div class="hp-specials">
       <div>${wild}<p><b>百搭 WILD</b>可替代除了 SCATTER（胡）以外的所有符號。</p></div>
       <div>${hu}<p><b>SCATTER（胡）</b>任意位置出現 3 個即觸發免費遊戲。</p></div>
@@ -46,7 +46,7 @@ const paytablePage = `
     </ul>
   </section>
   <section>
-    <h3>3.2 1024 種中獎方式</h3>
+    <h3>1024 種中獎方式</h3>
     <ul class="hp-notes">
       <li>相同符號必須從最左邊的轉軸開始，在相鄰轉軸連續出現才算中獎。</li>
     </ul>
@@ -68,20 +68,20 @@ const paytablePage = `
 
 const featuresPage = `
   <section>
-    <h3>2.2 百搭與 SCATTER</h3>
+    <h3>百搭與 SCATTER</h3>
     <div class="hp-specials">
       <div>${wild}<p>百搭可替代除了 SCATTER 以外的所有符號。</p></div>
       <div>${tile('glyph_fa', true)}<p>金色符號只會出現在第 2、3、4 軸。</p></div>
     </div>
   </section>
   <section>
-    <h3>2.3 金色符號</h3>
+    <h3>金色符號</h3>
     <div class="hp-flow">${tile('glyph_zhong', true)}<span>→</span>${wild}</div>
     <p>任何一局中，第 2、3 或 4 軸上的部分符號（百搭與 SCATTER 除外）可能以金色出現。</p>
     <p>每一輪新符號落下補位後，上一輪參與中獎的金色符號會變成百搭符號。</p>
   </section>
   <section>
-    <h3>2.4 倍數</h3>
+    <h3>倍數</h3>
     ${mult([1, 2, 3, 5])}
     <p>每一局的所有贏分都會乘上轉軸上方顯示的倍數，第一輪從 x1 開始。</p>
     <ul class="hp-notes">
@@ -91,7 +91,7 @@ const featuresPage = `
     </ul>
   </section>
   <section>
-    <h3>2.5 免費遊戲</h3>
+    <h3>免費遊戲</h3>
     <div class="hp-flow">${hu}${hu}${hu}<span>=</span><b class="hp-big">12</b><small>次免費遊戲</small></div>
     <p>任意位置出現 3 個 SCATTER 即觸發 12 次免費遊戲，每多 1 個 SCATTER 再多 2 次。</p>
     <p>免費遊戲中，轉軸上方的倍數會提升為 x2、x4、x6、x10：</p>
@@ -103,7 +103,7 @@ const featuresPage = `
 const TODO = '<em class="hp-todo">（Demo 尚未提供）</em>'
 const controlsPage = `
   <section>
-    <h3>4.1 選單按鈕</h3>
+    <h3>選單按鈕</h3>
     <div class="hp-controls">
       <div><img class="hp-icon spin" src="${art('spin_round')}" alt=""><img class="hp-icon spin-arrows" src="${art('spin_arrows')}" alt=""><dl><dt>旋轉 SPIN</dt>
         <dd>以目前投注金額開始旋轉。</dd><dd>旋轉中再點按鈕或遊戲畫面，可讓轉軸立即停止。</dd>
