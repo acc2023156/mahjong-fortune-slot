@@ -1,0 +1,43 @@
+{
+  "game": "MW1_LIKE_V001",
+  "description": "Research seed model; not an original PG Soft PAR sheet or reel set.",
+  "grid": [4, 4, 4, 4, 4],
+  "ways": 1024,
+  "bet": 1,
+  "payingSymbols": ["H1", "H2", "H3", "M1", "M2", "L1", "L2", "L3"],
+  "scatterSymbol": "SC",
+  "wildSymbol": "W",
+  "weights": [
+    { "H1": 5, "H2": 6, "H3": 7, "M1": 10, "M2": 12, "L1": 18, "L2": 20, "L3": 22 },
+    { "H1": 5, "H2": 6, "H3": 7, "M1": 10, "M2": 12, "L1": 18, "L2": 20, "L3": 22, "SC": 2 },
+    { "H1": 5, "H2": 6, "H3": 7, "M1": 10, "M2": 12, "L1": 18, "L2": 20, "L3": 22, "SC": 2 },
+    { "H1": 5, "H2": 6, "H3": 7, "M1": 10, "M2": 12, "L1": 18, "L2": 20, "L3": 22, "SC": 2 },
+    { "H1": 5, "H2": 6, "H3": 7, "M1": 10, "M2": 12, "L1": 18, "L2": 20, "L3": 22 }
+  ],
+  "paytable": {
+    "H1": { "3": 0.25, "4": 0.60, "5": 1.50 },
+    "H2": { "3": 0.20, "4": 0.50, "5": 1.20 },
+    "H3": { "3": 0.15, "4": 0.40, "5": 1.00 },
+    "M1": { "3": 0.10, "4": 0.30, "5": 0.75 },
+    "M2": { "3": 0.08, "4": 0.25, "5": 0.60 },
+    "L1": { "3": 0.06, "4": 0.18, "5": 0.45 },
+    "L2": { "3": 0.05, "4": 0.15, "5": 0.35 },
+    "L3": { "3": 0.04, "4": 0.12, "5": 0.30 }
+  },
+  "goldChanceByReel": [0, 0.10, 0.12, 0.10, 0],
+  "baseMultipliers": [1, 2, 3, 5],
+  "freeMultipliers": [2, 4, 6, 10],
+  "freeSpins": { "triggerScatters": 3, "initialAward": 10, "extraPerAdditionalScatter": 2 },
+  "maxCascadeSteps": 1000,
+  "maxFreeSpinsPerFeature": 10000,
+  "maxWin": 25000,
+  "targets": {
+    "totalRtp": 0.9692,
+    "baseRtp": 0.6889,
+    "freeSpinRtp": 0.2803,
+    "overallHitRate": 0.2854,
+    "baseHitRate": 0.2805,
+    "featureHitRate": 0.0049,
+    "tailFrequency": { "20To35": 287, "35To50": 970, "over50": 1222 }
+  }
+}

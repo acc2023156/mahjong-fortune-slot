@@ -454,7 +454,7 @@ export class ReelGrid extends Container {
       if (columns.length >= 3) {
         const reelCount = Math.min(5, columns.length) as 3 | 4 | 5
         const ways = columns.reduce((total, rows) => total * rows.length, 1)
-        payout += ways * SYMBOL_PAYS[target][reelCount] / 20
+        payout += ways * SYMBOL_PAYS[target][reelCount]
         symbols.push(target)
         columns.forEach((rows, col) => rows.forEach((row) => wins.add(`${row}:${col}`)))
       }

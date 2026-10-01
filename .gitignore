@@ -23,5 +23,8 @@ dist-ssr
 *.sln
 *.sw?
 
-# Local research captures (reference videos, raw asset dumps)
-research/
+# Local research captures (reference videos, raw asset dumps). Keep the
+# executable probability model versioned while excluding the large captures.
+research/*
+!research/math-engine/
+!research/math-engine/**

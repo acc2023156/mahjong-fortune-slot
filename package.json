@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "math:test": "node --test research/math-engine/test/*.test.mjs",
+    "math:sim": "node research/math-engine/scripts/simulate.mjs"
   },
   "devDependencies": {
     "typescript": "~6.0.2",
