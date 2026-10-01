@@ -1,4 +1,5 @@
-import { Container, Graphics, Text } from 'pixi.js'
+import { Container, Graphics, Sprite } from 'pixi.js'
+import { skin, skinSprite, SpriteNumber } from '../skin'
 
 export type SpinActions = {
   spin: () => void
@@ -8,92 +9,109 @@ export type SpinActions = {
   toggleAuto: () => void
 }
 
+const ROW_Y = 46
+
 export class SpinControls extends Container {
-  private readonly spinButton: Container
-  private readonly spinGlyph: Text
-  private readonly turboText: Text
-  private readonly autoText: Text
+  private readonly spinButton = new Container()
+  private readonly spinFace: Sprite
+  private readonly spinArrows: Sprite
+  private readonly counter = new SpriteNumber(40)
+  private readonly turboIcon: Sprite
+  private readonly turboRing: Graphics
+  private readonly autoRing: Graphics
+  private readonly autoIcon: Sprite
+  private readonly autoStop: Graphics
   private isSpinning = false
+  private spinSpeed = 0
 
   constructor(actions: SpinActions) {
     super()
-    this.addChild(new Graphics().roundRect(0, 0, 430, 170, 34).fill({ color: '#7d341f', alpha: 0.98 }).stroke({ color: '#e1a854', width: 2 }))
+    const turbo = this.iconButton(56, actions.toggleTurbo)
+    this.turboRing = turbo.ring
+    this.turboIcon = skinSprite('icon_turbo_off', 30)
+    turbo.button.addChild(this.turboIcon)
 
-    // Symmetric centers: 56, 119, 215, 311, 374.
-    // With radii 26, 24, 58, 24, 26 this gives equal 13–14 px visible gaps.
-    this.turboText = this.smallButton('⚡\nTURBO', 56, 72, actions.toggleTurbo)
-    this.roundButton('−', 119, 72, actions.decreaseBet)
-    this.spinButton = this.makeSpin(actions.spin)
-    this.roundButton('+', 311, 72, actions.increaseBet)
-    this.autoText = this.smallButton('▶\nAUTO', 374, 72, actions.toggleAuto)
-    this.spinGlyph = this.spinButton.children[2] as Text
+    const minus = this.iconButton(128, actions.decreaseBet)
+    minus.button.addChild(new Graphics().roundRect(-10, -1.8, 20, 3.6, 1.8).fill('#f2dcc0'))
 
-    const rotateIdle = () => {
-      if (!this.isSpinning) this.spinGlyph.rotation += 0.003
-      requestAnimationFrame(rotateIdle)
+    this.spinFace = skinSprite('spin_round', 147)
+    this.spinFace.anchor.set(.587, .49)
+    this.spinArrows = skinSprite('spin_arrows', 70)
+    this.counter.visible = false
+    this.spinButton.position.set(215, ROW_Y)
+    this.spinButton.addChild(this.spinFace, this.spinArrows, this.counter)
+    this.activate(this.spinButton, actions.spin)
+    this.addChild(this.spinButton)
+
+    const plus = this.iconButton(302, actions.increaseBet)
+    plus.button.addChild(skinSprite('icon_plus', 20))
+
+    const auto = this.iconButton(374, actions.toggleAuto)
+    this.autoRing = auto.ring
+    this.autoIcon = skinSprite('icon_play', 16)
+    this.autoIcon.x = 2
+    this.autoStop = new Graphics().roundRect(-7, -7, 14, 14, 2).fill('#fff1c4')
+    this.autoStop.visible = false
+    auto.button.addChild(this.autoIcon, this.autoStop)
+
+    const tick = () => {
+      // Arrows idle-rotate slowly, spin up while reels move, then ease back.
+      const target = this.isSpinning ? .32 : .012
+      this.spinSpeed += (target - this.spinSpeed) * .12
+      this.spinArrows.rotation += this.spinSpeed
+      requestAnimationFrame(tick)
     }
-    requestAnimationFrame(rotateIdle)
+    requestAnimationFrame(tick)
   }
 
-  private roundButton(text: string, x: number, y: number, action: () => void) {
+  private iconButton(x: number, action: () => void) {
     const button = new Container()
-    button.position.set(x, y)
-    button.addChild(new Graphics().circle(0, 0, 24).fill('#9b482e').stroke({ color: '#d8864d', width: 2 }))
-    const label = new Text({ text, style: { fontFamily: 'Arial', fontSize: 30, fill: '#f3bd7b' } })
-    label.anchor.set(0.5)
-    button.addChild(label)
+    button.position.set(x, ROW_Y)
+    const ring = new Graphics()
+    this.paintRing(ring, false)
+    button.addChild(ring)
     this.activate(button, action)
     this.addChild(button)
+    return { button, ring }
   }
 
-  private smallButton(text: string, x: number, y: number, action: () => void) {
-    const button = new Container()
-    button.position.set(x, y)
-    const label = new Text({ text, style: { align: 'center', fontFamily: 'Arial', fontSize: 11, fontWeight: '800', fill: '#e8ae66', lineHeight: 14 } })
-    label.anchor.set(0.5)
-    button.addChild(new Graphics().circle(0, 0, 26).fill({ color: '#401d18', alpha: 0.65 }), label)
-    this.activate(button, action)
-    this.addChild(button)
-    return label
-  }
-
-  private makeSpin(action: () => void) {
-    const button = new Container()
-    button.position.set(215, 72)
-    button.addChild(
-      new Graphics().circle(0, 0, 58).fill('#e6c16e').stroke({ color: '#fff1bd', width: 5 }),
-      new Graphics().circle(0, 0, 48).fill('#23a889').stroke({ color: '#157461', width: 5 }),
-    )
-    const glyph = new Text({ text: '↻', style: { fontFamily: 'Arial', fontSize: 68, fontWeight: '900', fill: '#e9f4d8' } })
-    glyph.anchor.set(0.5)
-    glyph.position.y = -3
-    button.addChild(glyph)
-    this.activate(button, action)
-    this.addChild(button)
-    return button
+  private paintRing(ring: Graphics, active: boolean) {
+    ring.clear()
+      .circle(0, 0, 23).fill({ color: active ? '#8a4a1c' : '#2a120b', alpha: active ? .95 : .55 })
+      .circle(0, 0, 23).stroke({ color: active ? '#ffd76a' : '#c79a6a', width: 1.5, alpha: active ? 1 : .55 })
   }
 
   private activate(button: Container, action: () => void) {
     button.eventMode = 'static'
     button.cursor = 'pointer'
-    button.on('pointerdown', () => button.scale.set(0.94))
+    button.on('pointerdown', () => button.scale.set(0.93))
     button.on('pointerupoutside', () => button.scale.set(1))
     button.on('pointerup', () => { button.scale.set(1); action() })
   }
 
   setSpinning(active: boolean) {
     this.isSpinning = active
-    this.spinButton.alpha = active ? 0.65 : 1
-    this.spinGlyph.rotation = 0
-    this.spinGlyph.text = active ? '…' : '↻'
+  }
+
+  /** Free spins show the jade square face with the remaining count, like the reference. */
+  setCounter(value: number | null) {
+    const showCount = value !== null
+    this.spinFace.texture = skin()[showCount ? 'spin_idle' : 'spin_round']
+    this.spinArrows.visible = !showCount
+    this.counter.visible = showCount
+    if (showCount) this.counter.text = String(value)
   }
 
   setTurbo(active: boolean) {
-    this.turboText.style.fill = active ? '#fff08a' : '#e8ae66'
+    this.turboIcon.texture = skin()[active ? 'icon_turbo_on' : 'icon_turbo_off']
+    this.turboIcon.scale.set((active ? 22 : 30) / this.turboIcon.texture.width)
+    this.turboIcon.tint = active ? 0xffe066 : 0xffffff
+    this.paintRing(this.turboRing, active)
   }
 
   setAuto(active: boolean) {
-    this.autoText.text = active ? '■\nAUTO' : '▶\nAUTO'
-    this.autoText.style.fill = active ? '#fff08a' : '#e8ae66'
+    this.autoIcon.visible = !active
+    this.autoStop.visible = active
+    this.paintRing(this.autoRing, active)
   }
 }
