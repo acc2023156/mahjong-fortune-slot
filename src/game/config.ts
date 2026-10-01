@@ -77,16 +77,30 @@ export class ReelStrips {
     const above: CellState[] = []
     const below: CellState[] = []
     for (let col = 0; col < REEL_COLUMNS; col++) {
-      for (let row = 0; row < rows; row++) grid[row][col] = drawCell(col, this.freeMode)
-      above[col] = drawCell(col, this.freeMode)
-      below[col] = drawCell(col, this.freeMode)
+      let scatters = 0
+      const officialCell = () => {
+        const excluded = scatters >= ACTIVE_MATH.maxScatterPerReel
+          ? new Set<SymbolId>(['scatter'])
+          : new Set<SymbolId>()
+        const cell = drawCell(col, this.freeMode, Math.random, excluded)
+        if (cell.symbol === 'scatter') scatters++
+        return cell
+      }
+      for (let row = 0; row < rows; row++) grid[row][col] = officialCell()
+      above[col] = officialCell()
+      below[col] = officialCell()
     }
     return { grid, above, below }
   }
 
   /** Next probability result falling into `column` during a cascade. */
-  next(column: number) {
-    return drawCell(column, this.freeMode)
+  next(column: number, scatterAllowed = true) {
+    return drawCell(
+      column,
+      this.freeMode,
+      Math.random,
+      scatterAllowed ? new Set<SymbolId>() : new Set<SymbolId>(['scatter']),
+    )
   }
 
   /** A passing symbol while the reel is spinning. */

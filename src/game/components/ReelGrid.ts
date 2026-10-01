@@ -258,6 +258,7 @@ export class ReelGrid extends Container {
     const phases = Array.from({ length: REEL_COLUMNS }, () => 0) // 0 spinning, 1 settling, 2 stopped
     const settleStarts = Array.from({ length: REEL_COLUMNS }, () => 0)
     const offsets = Array.from({ length: REEL_COLUMNS }, () => 0)
+    const landingStarts = Array.from({ length: REEL_COLUMNS }, () => Array.from({ length: SLOTS }, () => 0))
     const lastY = this.views.map((column) => column.map((view) => view.y))
     const start = performance.now()
     let lastFrame = start
@@ -266,12 +267,17 @@ export class ReelGrid extends Container {
     const settleColumn = (col: number) => {
       if (phases[col] !== 0) return
       phases[col] = 1
-      this.blurs[col].enabled = false
       settleStarts[col] = performance.now()
       this.states[col][0] = this.pendingPeeks?.above[col] ?? this.strips.blur(col)
       this.states[col][SLOTS - 1] = this.pendingPeeks?.below[col] ?? this.strips.blur(col)
       for (let row = 0; row < REEL_ROWS; row++) this.states[col][row + 1] = outcome[row][col]
-      for (let slot = 0; slot < SLOTS; slot++) this.paint(col, slot)
+      for (let slot = 0; slot < SLOTS; slot++) {
+        this.paint(col, slot)
+        // Stage every official tile exactly one cell before its final position. It remains
+        // motion-blurred while entering, so the result never appears as an in-place swap.
+        landingStarts[col][slot] = this.slotY(slot) - PITCH_Y
+        this.place(col, slot, landingStarts[col][slot])
+      }
     }
 
     const animate = () => {
@@ -300,8 +306,13 @@ export class ReelGrid extends Container {
           }
         } else if (phases[col] === 1) {
           const progress = Math.min(1, (now - settleStarts[col]) / (callbacks.turbo ? 90 : 150))
-          const drop = 16 * (1 - easeOutBack(progress, 1.6))
-          for (let slot = 0; slot < SLOTS; slot++) this.place(col, slot, this.slotY(slot) - drop)
+          const travel = easeOutBack(progress, 1.15)
+          this.blurs[col].strengthY = 9 * Math.max(0, 1 - progress / .82)
+          if (progress >= .82) this.blurs[col].enabled = false
+          for (let slot = 0; slot < SLOTS; slot++) {
+            const target = this.slotY(slot)
+            this.place(col, slot, landingStarts[col][slot] + (target - landingStarts[col][slot]) * travel)
+          }
           if (progress >= 1) {
             phases[col] = 2
             for (let slot = 0; slot < SLOTS; slot++) this.place(col, slot, this.slotY(slot))
@@ -710,7 +721,15 @@ export class ReelGrid extends Container {
       }
       const removed = REEL_ROWS + 1 - survivorSlots.length
       // The strip tile nearest the board is drawn first and lands lowest.
-      const incoming = Array.from({ length: removed }, () => this.strips.next(col)).reverse()
+      const survivorScatterCount = survivorSlots
+        .map((slot) => this.states[col][slot])
+        .filter((cell) => cell.symbol === 'scatter').length
+      let scatterSlotsLeft = Math.max(0, 1 - survivorScatterCount)
+      const incoming = Array.from({ length: removed }, () => {
+        const cell = this.strips.next(col, scatterSlotsLeft > 0)
+        if (cell.symbol === 'scatter') scatterSlotsLeft--
+        return cell
+      }).reverse()
       // Slots 0..4 refill as [new…, survivors (incl. the old top peek)…]; slot 5 stays.
       const next = [...incoming, ...survivorSlots.map((slot) => this.states[col][slot])]
       starts[col] = []

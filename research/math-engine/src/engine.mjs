@@ -26,6 +26,10 @@ export function validateConfig(config) {
       assert(total > 0, `free reel ${reel + 1} has no positive weights`)
     })
   }
+  if (config.maxScatterPerReel !== undefined) {
+    assert(Number.isInteger(config.maxScatterPerReel) && config.maxScatterPerReel >= 0,
+      'maxScatterPerReel must be a non-negative integer')
+  }
   return config
 }
 
@@ -40,9 +44,10 @@ export function weightedSymbol(pool, rng) {
   return entries.at(-1)[0]
 }
 
-export function createCell(config, reel, rng, freeMode = false) {
+export function createCell(config, reel, rng, freeMode = false, excludedSymbols = new Set()) {
   const pools = freeMode && config.freeWeights ? config.freeWeights : config.weights
-  const symbol = weightedSymbol(pools[reel], rng)
+  const pool = Object.fromEntries(Object.entries(pools[reel]).filter(([symbol]) => !excludedSymbols.has(symbol)))
+  const symbol = weightedSymbol(pool, rng)
   const canBeGold = symbol !== config.scatterSymbol && symbol !== config.wildSymbol
   const goldChances = freeMode && config.freeGoldChanceByReel
     ? config.freeGoldChanceByReel
@@ -51,9 +56,17 @@ export function createCell(config, reel, rng, freeMode = false) {
 }
 
 export function generateBoard(config, rng, freeMode = false) {
-  return config.grid.map((height, reel) =>
-    Array.from({ length: height }, () => createCell(config, reel, rng, freeMode)),
-  )
+  return config.grid.map((height, reel) => {
+    let scatters = 0
+    return Array.from({ length: height }, () => {
+      const excluded = scatters >= (config.maxScatterPerReel ?? Infinity)
+        ? new Set([config.scatterSymbol])
+        : new Set()
+      const cell = createCell(config, reel, rng, freeMode, excluded)
+      if (cell.symbol === config.scatterSymbol) scatters++
+      return cell
+    })
+  })
 }
 
 export function countScatters(board, scatterSymbol = 'SC') {
@@ -102,7 +115,15 @@ export function cascadeBoard(board, winningCells, config, rng, freeMode = false)
       if (!winningCells.has(`${reelIndex}:${row}`)) survivors.push(cell)
       else if (cell.gold) survivors.push({ symbol: config.wildSymbol, gold: false })
     }
-    while (survivors.length < reel.length) survivors.unshift(createCell(config, reelIndex, rng, freeMode))
+    let scatters = survivors.filter((cell) => cell.symbol === config.scatterSymbol).length
+    while (survivors.length < reel.length) {
+      const excluded = scatters >= (config.maxScatterPerReel ?? Infinity)
+        ? new Set([config.scatterSymbol])
+        : new Set()
+      const cell = createCell(config, reelIndex, rng, freeMode, excluded)
+      if (cell.symbol === config.scatterSymbol) scatters++
+      survivors.unshift(cell)
+    }
     return survivors
   })
 }

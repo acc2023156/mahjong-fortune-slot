@@ -1,11 +1,12 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
-import { evaluateWays, cascadeBoard, freeSpinAward, multiplierFor, validateConfig } from '../src/engine.mjs'
+import { evaluateWays, cascadeBoard, freeSpinAward, generateBoard, multiplierFor, validateConfig } from '../src/engine.mjs'
 import { createRng } from '../src/rng.mjs'
 
 const config = validateConfig(JSON.parse(await readFile(new URL('../config/mw1-like-v001.json', import.meta.url), 'utf8')))
 const v002 = validateConfig(JSON.parse(await readFile(new URL('../config/mw1-like-v002.json', import.meta.url), 'utf8')))
+const v003 = validateConfig(JSON.parse(await readFile(new URL('../config/mw1-like-v003.json', import.meta.url), 'utf8')))
 const cell = (symbol, gold = false) => ({ symbol, gold })
 
 test('12 ways pay the longest H1 combination once', () => {
@@ -66,4 +67,22 @@ test('V002 awards 12 spins and permits scatters on every reel', () => {
   assert.equal(v002.freeWeights.length, 5)
   assert.ok(v002.weights.every((reel) => reel.SC > 0))
   assert.ok(v002.freeWeights.every((reel) => reel.SC > 0))
+})
+
+test('V003 never generates more than one scatter on the same reel', () => {
+  const rng = createRng(20261003)
+  for (let spin = 0; spin < 10_000; spin++) {
+    const board = generateBoard(v003, rng, spin % 2 === 0)
+    for (const reel of board) {
+      assert.ok(reel.filter((cell) => cell.symbol === 'SC').length <= 1)
+    }
+  }
+})
+
+test('V003 cascade refill preserves the one-scatter-per-reel limit', () => {
+  const board = Array.from({ length: 5 }, () => [cell('SC'), cell('H1'), cell('H1'), cell('H1')])
+  const winners = new Set()
+  for (let reel = 0; reel < 5; reel++) for (let row = 1; row < 4; row++) winners.add(`${reel}:${row}`)
+  const next = cascadeBoard(board, winners, v003, createRng(20261003))
+  for (const reel of next) assert.equal(reel.filter((item) => item.symbol === 'SC').length, 1)
 })
