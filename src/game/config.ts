@@ -65,26 +65,32 @@ export function freeSpinsForScatters(scatterCount: number) {
  * Every visible result and cascade refill comes from the active per-reel pool.
  */
 export class ReelStrips {
+  private freeMode = false
+
+  setFreeMode(value: boolean) {
+    this.freeMode = value
+  }
+
   /** Samples every playable cell at SPIN time and keeps the result fixed during the stop animation. */
   stop(rows: number) {
     const grid: CellState[][] = Array.from({ length: rows }, () => [])
     const above: CellState[] = []
     const below: CellState[] = []
     for (let col = 0; col < REEL_COLUMNS; col++) {
-      for (let row = 0; row < rows; row++) grid[row][col] = drawCell(col)
-      above[col] = drawCell(col)
-      below[col] = drawCell(col)
+      for (let row = 0; row < rows; row++) grid[row][col] = drawCell(col, this.freeMode)
+      above[col] = drawCell(col, this.freeMode)
+      below[col] = drawCell(col, this.freeMode)
     }
     return { grid, above, below }
   }
 
   /** Next probability result falling into `column` during a cascade. */
   next(column: number) {
-    return drawCell(column)
+    return drawCell(column, this.freeMode)
   }
 
   /** A passing symbol while the reel is spinning. */
   blur(column: number) {
-    return drawCell(column)
+    return drawCell(column, this.freeMode)
   }
 }

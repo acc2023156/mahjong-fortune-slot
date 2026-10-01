@@ -5,6 +5,7 @@ import { evaluateWays, cascadeBoard, freeSpinAward, multiplierFor, validateConfi
 import { createRng } from '../src/rng.mjs'
 
 const config = validateConfig(JSON.parse(await readFile(new URL('../config/mw1-like-v001.json', import.meta.url), 'utf8')))
+const v002 = validateConfig(JSON.parse(await readFile(new URL('../config/mw1-like-v002.json', import.meta.url), 'utf8')))
 const cell = (symbol, gold = false) => ({ symbol, gold })
 
 test('12 ways pay the longest H1 combination once', () => {
@@ -55,4 +56,14 @@ test('seeded RNG is reproducible', () => {
   const a = createRng(42)
   const b = createRng(42)
   assert.deepEqual(Array.from({ length: 10 }, a), Array.from({ length: 10 }, b))
+})
+
+test('V002 awards 12 spins and permits scatters on every reel', () => {
+  assert.equal(freeSpinAward(2, v002), 0)
+  assert.equal(freeSpinAward(3, v002), 12)
+  assert.equal(freeSpinAward(5, v002), 16)
+  assert.equal(v002.weights.length, 5)
+  assert.equal(v002.freeWeights.length, 5)
+  assert.ok(v002.weights.every((reel) => reel.SC > 0))
+  assert.ok(v002.freeWeights.every((reel) => reel.SC > 0))
 })

@@ -74,6 +74,7 @@ export class ReelGrid extends Container {
   private quickStopRequested = false
   private readonly strips = new ReelStrips()
   private pendingPeeks: { above: CellState[]; below: CellState[] } | undefined
+  private spinScatterCount = 0
 
   constructor() {
     super()
@@ -235,7 +236,9 @@ export class ReelGrid extends Container {
     if (this.running) return
     this.running = true
     this.quickStopRequested = false
+    this.strips.setFreeMode(callbacks.freeMode)
     const outcome = this.makeOutcome(false)
+    this.spinScatterCount = this.countScatters(outcome)
     const stopTimes = callbacks.turbo ? [430, 430, 430, 430, 430] : [780, 870, 960, 1050, 1140]
     // Reference near miss: once two 胡 have landed, every later reel becomes a slow near-miss
     // reel in turn, each spinning NEAR_MISS_MS after the previous reel stops.
@@ -510,7 +513,7 @@ export class ReelGrid extends Container {
       }
     }
     this.running = false
-    callbacks.complete(total, this.countScatters())
+    callbacks.complete(total, this.spinScatterCount)
   }
 
   private highlightWinners(wins: Set<string>, callbacks: ReelSpinCallbacks) {

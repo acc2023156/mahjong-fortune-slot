@@ -19,6 +19,13 @@ export function validateConfig(config) {
       assert(Number.isFinite(weight) && weight >= 0, `invalid weight for reel ${reel + 1} ${symbol}`)
     }
   })
+  if (config.freeWeights) {
+    assert(config.freeWeights.length === 5, 'freeWeights must contain one pool per reel')
+    config.freeWeights.forEach((pool, reel) => {
+      const total = Object.values(pool).reduce((sum, weight) => sum + weight, 0)
+      assert(total > 0, `free reel ${reel + 1} has no positive weights`)
+    })
+  }
   return config
 }
 
@@ -33,15 +40,19 @@ export function weightedSymbol(pool, rng) {
   return entries.at(-1)[0]
 }
 
-export function createCell(config, reel, rng) {
-  const symbol = weightedSymbol(config.weights[reel], rng)
+export function createCell(config, reel, rng, freeMode = false) {
+  const pools = freeMode && config.freeWeights ? config.freeWeights : config.weights
+  const symbol = weightedSymbol(pools[reel], rng)
   const canBeGold = symbol !== config.scatterSymbol && symbol !== config.wildSymbol
-  return { symbol, gold: canBeGold && rng() < config.goldChanceByReel[reel] }
+  const goldChances = freeMode && config.freeGoldChanceByReel
+    ? config.freeGoldChanceByReel
+    : config.goldChanceByReel
+  return { symbol, gold: canBeGold && rng() < goldChances[reel] }
 }
 
-export function generateBoard(config, rng) {
+export function generateBoard(config, rng, freeMode = false) {
   return config.grid.map((height, reel) =>
-    Array.from({ length: height }, () => createCell(config, reel, rng)),
+    Array.from({ length: height }, () => createCell(config, reel, rng, freeMode)),
   )
 }
 
@@ -83,7 +94,7 @@ export function evaluateWays(board, config) {
 }
 
 /** Winning gold tiles become persistent WILDs; other winners disappear, then each reel refills. */
-export function cascadeBoard(board, winningCells, config, rng) {
+export function cascadeBoard(board, winningCells, config, rng, freeMode = false) {
   return board.map((reel, reelIndex) => {
     const survivors = []
     for (let row = 0; row < reel.length; row += 1) {
@@ -91,7 +102,7 @@ export function cascadeBoard(board, winningCells, config, rng) {
       if (!winningCells.has(`${reelIndex}:${row}`)) survivors.push(cell)
       else if (cell.gold) survivors.push({ symbol: config.wildSymbol, gold: false })
     }
-    while (survivors.length < reel.length) survivors.unshift(createCell(config, reelIndex, rng))
+    while (survivors.length < reel.length) survivors.unshift(createCell(config, reelIndex, rng, freeMode))
     return survivors
   })
 }
@@ -103,7 +114,7 @@ export function multiplierFor(step, multipliers) {
 export function playPaidSpin(config, rng, options = {}) {
   const freeMode = options.freeMode ?? false
   const multipliers = freeMode ? config.freeMultipliers : config.baseMultipliers
-  let board = options.board ? structuredClone(options.board) : generateBoard(config, rng)
+  let board = options.board ? structuredClone(options.board) : generateBoard(config, rng, freeMode)
   const initialBoard = structuredClone(board)
   const scatterCount = countScatters(initialBoard, config.scatterSymbol)
   const cascades = []
@@ -115,7 +126,7 @@ export function playPaidSpin(config, rng, options = {}) {
     const win = result.payout * multiplier
     totalWin += win
     cascades.push({ step, multiplier, win, wins: result.wins, board: structuredClone(board) })
-    board = cascadeBoard(board, result.winningCells, config, rng)
+    board = cascadeBoard(board, result.winningCells, config, rng, freeMode)
   }
   throw new Error(`cascade safety limit (${config.maxCascadeSteps}) reached`)
 }
