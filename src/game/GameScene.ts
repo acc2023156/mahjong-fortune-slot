@@ -4,7 +4,7 @@ import { SpinControls } from './components/SpinControls'
 import { StatusPanel } from './components/StatusPanel'
 import { AudioEngine, IDLE_LINES } from './AudioEngine'
 import { freeSpinsForScatters, GAME_HEIGHT, GAME_WIDTH } from './config'
-import { skin, skinSprite, SpriteNumber, whenDeferredReady, type SkinName } from './skin'
+import { skin, skinSprite, softGlowTexture, SpriteNumber, whenDeferredReady, type SkinName } from './skin'
 
 const BOARD_Y = 112
 const PLAQUE_Y = 535
@@ -24,9 +24,14 @@ class WinPlaque extends Container {
   private countToken = 0
   private readonly fxLayer = new Container()
 
+  private readonly frame = skinSprite('plaque_win', 410)
+  private readonly maxFrame = skinSprite('plaque_green', 432)
+  private maxed = false
+
   constructor() {
     super()
-    this.addChild(skinSprite('plaque_win', 410))
+    this.maxFrame.visible = false
+    this.addChild(this.frame, this.maxFrame)
     const mask = new Graphics().rect(-162, -20, 324, 40).fill('#fff')
     this.content.mask = mask
     this.note.anchor.set(.5)
@@ -37,6 +42,45 @@ class WinPlaque extends Container {
         if (this.marquee.x < -162 - this.marquee.width) this.nextMessage()
       }
       requestAnimationFrame(tick)
+    }
+    requestAnimationFrame(tick)
+  }
+
+  /**
+   * PDF 2.4: once the multiplier reaches its cap (x5, or x10 in Free Spins) the WIN plaque
+   * switches to the jade-capped frame with a pop and a light sweep; reset on the next spin.
+   */
+  setMaxed(on: boolean) {
+    if (on === this.maxed) return
+    this.maxed = on
+    this.frame.visible = !on
+    this.maxFrame.visible = on
+    if (!on) return
+    const base = this.maxFrame.scale.x
+    const sweep = new Sprite(softGlowTexture())
+    sweep.anchor.set(.5)
+    sweep.blendMode = 'add'
+    sweep.tint = 0xfff0a0
+    sweep.setSize(90, 60)
+    const glow = new Sprite(softGlowTexture())
+    glow.anchor.set(.5)
+    glow.blendMode = 'add'
+    glow.tint = 0x5dffa8
+    this.fxLayer.addChild(glow, sweep)
+    const start = performance.now()
+    const tick = () => {
+      if (sweep.destroyed) return
+      const t = Math.min(1, (performance.now() - start) / 900)
+      this.maxFrame.scale.set(base * (1 + .12 * Math.sin(Math.min(1, t / .35) * Math.PI)))
+      sweep.x = -200 + 400 * Math.min(1, t / .8)
+      sweep.alpha = t < .8 ? .9 : (1 - t) / .2
+      // Jade caps flare green at both ends.
+      glow.setSize(470, 70)
+      glow.alpha = .55 * (1 - t)
+      if (t < 1) { requestAnimationFrame(tick); return }
+      this.maxFrame.scale.set(base)
+      sweep.destroy()
+      glow.destroy()
     }
     requestAnimationFrame(tick)
   }
@@ -182,6 +226,8 @@ export class GameScene extends Container {
   private readonly fxLayer = new Container()
   private readonly audio = new AudioEngine()
   private readonly modalLayer = new Container()
+  /** Opens the 玩法說明 page (set by main.ts). */
+  onHelp?: () => void
   /** Replaces the balance row and buttons during Free Spins (reference: large REMAINING panel). */
   private readonly freePanel = new Container()
 
@@ -205,6 +251,17 @@ export class GameScene extends Container {
     multBar.setSize(GAME_WIDTH, 64)
     multBar.y = 50
     this.addChild(waysBar, ways, multBar)
+    // 玩法說明 entry (PDF 4.1 PAYTABLE / RULES), top-left of the 1024 WAYS bar.
+    const help = new Container()
+    help.position.set(26, 27)
+    help.addChild(new Graphics().circle(0, 0, 15).fill({ color: '#3a0d09', alpha: .85 }).stroke({ color: '#e2b04f', width: 2 }))
+    const helpMark = new Text({ text: '?', style: { fontFamily: 'Arial Black', fontSize: 18, fill: '#ffe08a' } })
+    helpMark.anchor.set(.5)
+    help.addChild(helpMark)
+    help.eventMode = 'static'
+    help.cursor = 'pointer'
+    help.on('pointertap', () => { this.audio.uiClick(); this.onHelp?.() })
+    this.addChild(help)
     BASE_STEPS.forEach((_, index) => {
       const sprite = skinSprite('mult_x1', undefined, 42)
       sprite.position.set(70 + index * 97, 82)
@@ -285,6 +342,7 @@ export class GameScene extends Container {
     if (!freeMode) this.balance -= this.bet
     this.win = 0
     if (freeMode) this.updateFreePanel()
+    this.plaque.setMaxed(false)
     this.plaque.showMessages(freeMode ? FREE_MESSAGES : IDLE_MESSAGES)
     this.controls.setSpinning(true)
     this.updateStatus()
@@ -309,6 +367,8 @@ export class GameScene extends Container {
         this.win += win * this.bet
         this.plaque.showAmount(this.win, false, previous)
         this.plaque.flash()
+        const cap = (freeMode ? FREE_STEPS : BASE_STEPS).at(-1)
+        if (multiplier >= (cap ?? Infinity)) this.plaque.setMaxed(true)
       },
       advance: (next) => {
         this.setMultiplier(next, freeMode)
@@ -706,7 +766,7 @@ export class GameScene extends Container {
   /**
    * Big Win (reference screenshots): the board stays visible under a dark veil; radial ray fans,
    * the gold 壽 ring and the mirrored tile pile sit behind the title and a large gold amount while
-   * coins rain down. The title upgrades BIG → MEGA → SUPER MEGA as the count passes 35× / 60× bet;
+   * coins rain down. The title upgrades BIG → MEGA → SUPER MEGA as the count passes 35× / 50× bet;
    * MEGA adds the coin pots, SUPER MEGA the ingot stacks. First tap jumps to the final amount,
    * the next tap (or 1.6 s) closes it.
    */
@@ -755,8 +815,9 @@ export class GameScene extends Container {
     pile.position.set(cx, 322)
     screen.addChild(pile)
     const titles: SkinName[] = ['title_big_win', 'title_mega_win', 'title_super_mega_win']
-    const tierAt = (value: number) => value >= this.bet * 60 ? 2 : value >= this.bet * 35 ? 1 : 0
-    const finalTier = betMultiple >= 60 ? 2 : betMultiple >= 35 ? 1 : 0
+    // PDF 1.2: Big Win x20–35, Mega Win x35–50, Super Mega Win x50 and above.
+    const tierAt = (value: number) => value >= this.bet * 50 ? 2 : value >= this.bet * 35 ? 1 : 0
+    const finalTier = betMultiple >= 50 ? 2 : betMultiple >= 35 ? 1 : 0
     const heading = skinSprite(titles[0], 230)
     heading.position.set(cx, 396)
     const value = new SpriteNumber(90)

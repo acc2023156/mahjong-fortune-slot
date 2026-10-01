@@ -487,11 +487,20 @@ export class ReelGrid extends Container {
       callbacks.tumble(tumble + 1, multiplier, result.payout * multiplier, result.symbols, result.wild)
 
       await this.highlightWinners(result.wins, callbacks)
-      const converted = await this.clearWinners(result.wins, callbacks)
+      const kept = await this.clearWinners(result.wins, callbacks)
+      // Remember the kept gold tiles by identity: the refill moves them down their column.
+      const goldStates = new Set([...kept].map((key) => {
+        const [row, col] = key.split(':').map(Number)
+        return this.rowState(row, col)
+      }))
       await this.pause(turbo ? 100 : 820)
+      // Coins settle on the dark board, then the dim lifts and the rail advances before the drop.
+      this.dim.visible = false
+      this.restoreLayering()
       callbacks.advance(multiplierForTumble(tumble + 1, callbacks.freeMode))
       await this.pause(turbo ? 40 : 150)
-      await this.refill(result.wins, converted, callbacks)
+      await this.refill(result.wins, kept, callbacks)
+      await this.convertGold(goldStates, callbacks)
       await this.pause(turbo ? 40 : 160)
 
       tumble++
@@ -512,7 +521,7 @@ export class ReelGrid extends Container {
     const lit = new Set<number>()
     this.dim.visible = true
     return this.tween(duration, (_t, elapsed) => {
-      this.dim.alpha = Math.max(.01, .55 * Math.min(1, elapsed / 120) * Math.min(1, (duration - elapsed) / 140))
+      this.dim.alpha = Math.max(.01, .55 * Math.min(1, elapsed / 120))
       for (const key of wins) {
         const [row, col] = key.split(':').map(Number)
         const since = elapsed - col * stagger
@@ -532,13 +541,11 @@ export class ReelGrid extends Container {
         if (view.parent !== this.reelLayer) this.reelLayer.addChild(view)
       }
     }).then(() => {
-      this.dim.visible = false
       for (const column of this.views) for (const view of column) {
         view.tint = 0xffffff
         view.frame.visible = false
         view.glow.visible = false
       }
-      this.restoreLayering()
     })
   }
 
@@ -548,13 +555,17 @@ export class ReelGrid extends Container {
     }))
   }
 
-  /** Returns the keys of winning gold tiles that turned into WILD (they stay on the board). */
+  /**
+   * Winning tiles turn edge-on and burst into gold coins and dust where they stand while the
+   * rest of the board stays dimmed (PDF 2.3, image 3). Winning gold tiles are kept: they turn
+   * into WILD only after the new tiles have cascaded down (see convertGold).
+   * Returns the keys of the kept gold winners.
+   */
   private async clearWinners(wins: Set<string>, callbacks: ReelSpinCallbacks) {
     const duration = callbacks.turbo ? 260 : 540
     const winners = [...wins].map((key) => key.split(':').map(Number) as [number, number])
-    const converted = new Set(winners.filter(([row, col]) => this.rowState(row, col).gold).map(([row, col]) => `${row}:${col}`))
+    const kept = new Set(winners.filter(([row, col]) => this.rowState(row, col).gold).map(([row, col]) => `${row}:${col}`))
     callbacks.sound('flip')
-    if (converted.size) callbacks.sound('wild')
     const turnFrames = skin().frames.turn
     let lastFrame = -1
     let burstFired = false
@@ -566,43 +577,51 @@ export class ReelGrid extends Container {
       const fireBurst = !burstFired && t >= .5
       if (fireBurst) burstFired = true
       for (const [row, col] of winners) {
-        const slot = row + 1
-        const view = this.views[col][slot]
-        const cx = this.baseX(col) + CELL_WIDTH / 2
-        const cy = this.rowY(row) + CELL_HEIGHT / 2
-        if (converted.has(`${row}:${col}`)) {
-          // Gold tiles flip once and land face-up as a WILD ingot.
-          if (fireBurst) {
-            this.states[col][slot] = { symbol: 'wild', gold: false }
-            this.paint(col, slot)
-            this.playBurst(cx, cy, 150)
-          }
-          this.place(col, slot, this.rowY(row), Math.max(.02, Math.abs(Math.cos(t * Math.PI))))
-          continue
-        }
+        if (kept.has(`${row}:${col}`)) continue
+        const view = this.views[col][row + 1]
         if (frameChanged && t < .6) {
-          const texture = turnFrames[frame]
-          view.tile.texture = texture
+          view.tile.texture = turnFrames[frame]
           view.tile.scale.set(ART_SCALE)
           // Keep the face glyph on the shrinking front face for the first frames, then hide it.
           view.glyph.visible = frame < 3
           view.glyph.scale.x = view.glyph.scale.y * (1 - frame * .14)
           view.glyph.x = CELL_WIDTH / 2 + frame * 3
         }
-        // Ordinary tiles burst into coins in place with a glow on top (reference tilefx frames).
-        if (fireBurst) this.goldDust(cx, cy, callbacks.turbo)
+        if (fireBurst) this.goldDust(this.baseX(col) + CELL_WIDTH / 2, this.rowY(row) + CELL_HEIGHT / 2, callbacks.turbo)
         view.alpha = t < .6 ? 1 : Math.max(0, 1 - (t - .6) / .25)
       }
     })
     for (const [row, col] of winners) {
-      const view = this.views[col][row + 1]
-      if (converted.has(`${row}:${col}`)) {
-        this.place(col, row + 1, this.rowY(row))
-        continue
-      }
-      view.visible = false
+      if (!kept.has(`${row}:${col}`)) this.views[col][row + 1].visible = false
     }
-    return converted
+    return kept
+  }
+
+  /**
+   * PDF 2.3: after the new symbols have cascaded down, every gold tile that was part of the
+   * previous round's win turns into a WILD ingot (flip + gold burst).
+   */
+  private async convertGold(goldStates: Set<CellState>, callbacks: ReelSpinCallbacks) {
+    const targets: [number, number][] = []
+    for (let col = 0; col < REEL_COLUMNS; col++) for (let slot = 1; slot <= REEL_ROWS; slot++) {
+      if (goldStates.has(this.states[col][slot])) targets.push([col, slot])
+    }
+    if (!targets.length) return
+    callbacks.sound('wild')
+    let swapped = false
+    await this.tween(callbacks.turbo ? 220 : 420, (t) => {
+      const crossing = !swapped && t >= .5
+      if (crossing) swapped = true
+      for (const [col, slot] of targets) {
+        if (crossing) {
+          this.states[col][slot] = { symbol: 'wild', gold: false }
+          this.paint(col, slot)
+          this.playBurst(this.baseX(col) + CELL_WIDTH / 2, this.slotY(slot) + CELL_HEIGHT / 2, 150)
+        }
+        this.place(col, slot, this.slotY(slot), Math.max(.02, Math.abs(Math.cos(t * Math.PI))))
+      }
+    })
+    for (const [col, slot] of targets) this.place(col, slot, this.slotY(slot))
   }
 
   private async refill(wins: Set<string>, converted: Set<string>, callbacks: ReelSpinCallbacks) {
@@ -707,6 +726,24 @@ export class ReelGrid extends Container {
       flash.setSize(CELL_WIDTH * (1.1 + t * .5), CELL_HEIGHT * (1.1 + t * .4))
       flash.alpha = .9 * (1 - t)
     }).then(() => flash.destroy())
+    // PDF 2.3 image 3: a few spinning gold coins pop out of the tile and hover in place.
+    const coinFrames = skin().frames.coinspin
+    for (let index = 0; index < (turbo ? 2 : 4); index++) {
+      const coin = new AnimatedSprite(coinFrames)
+      coin.anchor.set(.5)
+      coin.scale.set((11 + Math.random() * 7) / coinFrames[0].width)
+      coin.animationSpeed = .3 + Math.random() * .15
+      coin.gotoAndPlay(Math.floor(Math.random() * coinFrames.length))
+      const tx = x + (Math.random() - .5) * CELL_WIDTH * .8
+      const ty = y + (Math.random() - .5) * CELL_HEIGHT * .8
+      coin.position.set(x, y)
+      this.fxLayer.addChild(coin)
+      void this.tween((turbo ? 450 : 1000) + Math.random() * 250, (t) => {
+        const ease = 1 - Math.pow(1 - Math.min(1, t / .3), 3)
+        coin.position.set(x + (tx - x) * ease, y + (ty - y) * ease - t * 6)
+        coin.alpha = t < .7 ? 1 : 1 - (t - .7) / .3
+      }).then(() => coin.destroy())
+    }
     const count = turbo ? 18 : 40
     for (let index = 0; index < count; index++) {
       // Saturated gold dots drawn normally (additive washes out to pale green on the felt).

@@ -6,7 +6,7 @@ import type { SymbolId } from './config'
 const CORE_NAMES = [
   'tile_white', 'tile_gold', 'ingot', 'glyph_fa', 'glyph_zhong', 'glyph_bai', 'glyph_wan8', 'glyph_tong5',
   'glyph_suo5', 'glyph_tong2', 'glyph_suo2', 'glyph_hu', 'text_wild',
-  'spin_idle', 'spin_round', 'spin_arrows', 'plaque_win',
+  'spin_idle', 'spin_round', 'spin_arrows', 'plaque_win', 'plaque_green',
   'header_red', 'panel_wood', 'bar_ways', 'bar_mult', 'felt',
   'mult_x1', 'mult_x2', 'mult_x3', 'mult_x4', 'mult_x5', 'mult_x6', 'mult_x10',
   'msg_scatter', 'msg_ways', 'msg_free_x10', 'msg_gold', 'msg_x5', 'title_ways', 'label_win', 'label_total_win',

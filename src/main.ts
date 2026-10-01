@@ -6,6 +6,7 @@ import { GameScene } from './game/GameScene'
 import { loadDeferredSkin, loadSkin, skinUrl, skinUrls } from './game/skin'
 import { registerClientCache, seedClientCache } from './game/clientCache'
 import { createFeatureCenter } from './ui/featureCenter'
+import { createHelpPage } from './ui/helpPage'
 
 const assetUrl = (fileName: string) => `${import.meta.env.BASE_URL}assets/${fileName}`
 
@@ -58,6 +59,8 @@ try {
   // Dev-only handle for QA in the browser console (stripped from production builds).
   if (import.meta.env.DEV) Object.assign(window, { __slot: scene })
   createFeatureCenter(mount)
+  const help = createHelpPage()
+  scene.onHelp = help.open
   // Stage 2: feature-screen art streams in behind the running game, then everything is cached.
   void loadDeferredSkin().then(() => seedClientCache([
     ...skinUrls(),
