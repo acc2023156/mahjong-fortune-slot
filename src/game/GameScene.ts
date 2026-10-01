@@ -215,6 +215,10 @@ export class GameScene extends Container {
   private turbo = false
   private auto = false
   private autoTimer: number | undefined
+  /** Auto Spin rounds still to play (reference Auto Spin panel: 10 / 30 / 50 / 80 / 1000). */
+  private autoRemaining = 0
+  private autoPanel: Container | undefined
+  private viewBottom = GAME_HEIGHT
   private idleTimers: number[] = []
   private freeSpinsRemaining = 0
   private freeGameWin = 0
@@ -293,7 +297,7 @@ export class GameScene extends Container {
     this.addChild(this.status)
 
     this.controls = new SpinControls({
-      spin: () => this.spin(),
+      spin: () => this.pressSpin(),
       decreaseBet: () => { this.audio.button(); this.changeBet(-5) },
       increaseBet: () => { this.audio.button(); this.changeBet(5) },
       toggleTurbo: () => { this.audio.button(); this.turbo = !this.turbo; this.controls.setTurbo(this.turbo) },
@@ -322,6 +326,7 @@ export class GameScene extends Container {
     this.freePanel.y = lower
     this.panel.height = GAME_HEIGHT + extra - top - this.panel.y + 4
     this.modalPad = Math.round(extra / 2)
+    this.viewBottom = GAME_HEIGHT + extra - top
     this.modalLayer.y = this.modalPad - top
   }
 
@@ -358,6 +363,12 @@ export class GameScene extends Container {
     }
     this.spinning = true
     this.cancelIdleVoices()
+    if (this.auto && !freeMode) {
+      // Reference: the counter on the SPIN button ticks down shortly after each spin starts.
+      this.autoRemaining--
+      const left = this.autoRemaining
+      window.setTimeout(() => { if (this.auto && this.freeSpinsRemaining === 0) this.controls.setCounter(left) }, 500)
+    }
     this.audio.playMusic(freeMode)
     this.audio.spin()
     if (!freeMode) this.balance -= this.bet
@@ -461,24 +472,108 @@ export class GameScene extends Container {
     })
   }
 
+  /** SPIN press: stops Auto Spin while it runs (PDF 4.1 STOP), otherwise spins / quick-stops. */
+  private pressSpin() {
+    if (this.auto) { this.stopAuto(); return }
+    this.spin()
+  }
+
   private toggleAuto() {
-    this.auto = !this.auto
-    this.controls.setAuto(this.auto)
-    if (this.auto) {
-      if (!this.spinning) this.spin()
-    } else if (this.autoTimer !== undefined) {
+    if (this.auto) { this.stopAuto(); return }
+    if (this.spinning || this.freeSpinsRemaining > 0 || this.modalLayer.children.length) return
+    this.openAutoPanel()
+  }
+
+  private startAuto(rounds: number) {
+    this.closeAutoPanel()
+    this.auto = true
+    this.autoRemaining = rounds
+    this.controls.setAuto(true)
+    this.controls.setCounter(rounds)
+    this.spin()
+  }
+
+  private stopAuto() {
+    this.auto = false
+    this.autoRemaining = 0
+    if (this.autoTimer !== undefined) {
       clearTimeout(this.autoTimer)
       this.autoTimer = undefined
     }
+    this.controls.setAuto(false)
+    if (this.freeSpinsRemaining === 0) this.controls.setCounter(null)
   }
 
   private scheduleAuto() {
     if (!this.auto || this.freeSpinsRemaining > 0) return
+    if (this.autoRemaining <= 0) { this.stopAuto(); return }
     if (this.autoTimer !== undefined) clearTimeout(this.autoTimer)
     this.autoTimer = window.setTimeout(() => {
       this.autoTimer = undefined
-      this.spin()
+      if (this.auto) this.spin()
     }, this.turbo ? 280 : 700)
+  }
+
+  /** Reference Auto Spin sheet: dark purple panel over the lower screen, round-count pills and Start. */
+  private openAutoPanel() {
+    this.closeAutoPanel()
+    const panel = new Container()
+    const top = BOARD_Y + BOARD_HEIGHT - 70
+    const blocker = new Graphics().rect(0, -this.y, GAME_WIDTH, this.viewBottom + this.y).fill({ color: '#000', alpha: .35 })
+    blocker.eventMode = 'static'
+    blocker.on('pointertap', () => this.closeAutoPanel())
+    const sheet = new Graphics()
+      .roundRect(0, top, GAME_WIDTH, this.viewBottom - top + 20, 16).fill({ color: '#2b2741', alpha: .97 })
+      .rect(0, top + 52, GAME_WIDTH, 1).fill({ color: '#ffffff', alpha: .08 })
+    sheet.eventMode = 'static'
+    const text = (value: string, size: number, color: string, weight: '400' | '700' = '400') => {
+      const label = new Text({ text: value, style: { fontFamily: 'Arial', fontSize: size, fontWeight: weight, fill: color } })
+      label.anchor.set(.5)
+      return label
+    }
+    const title = text('Auto Spin', 17, '#ffffff', '700')
+    title.position.set(GAME_WIDTH / 2, top + 27)
+    const close = text('✕', 20, '#d8d4ea')
+    close.position.set(GAME_WIDTH - 34, top + 27)
+    close.eventMode = 'static'
+    close.cursor = 'pointer'
+    close.on('pointertap', () => { this.audio.uiClick(); this.closeAutoPanel() })
+    const caption = text('Number of Auto Spins', 13, '#a9a3c4')
+    caption.anchor.set(0, .5)
+    caption.position.set(26, top + 80)
+    panel.addChild(blocker, sheet, title, close, caption)
+    const options = [10, 30, 50, 80, 1000]
+    let chosen = 10
+    const pills = options.map((value, index) => {
+      const pill = new Container()
+      pill.position.set(57 + index * 79, top + 122)
+      const bg = new Graphics()
+      const label = text(String(value), 14, '#d8d4ea', '700')
+      pill.addChild(bg, label)
+      pill.eventMode = 'static'
+      pill.cursor = 'pointer'
+      pill.on('pointertap', () => { this.audio.uiClick(); chosen = value; paint() })
+      panel.addChild(pill)
+      return { pill, bg, value }
+    })
+    const paint = () => pills.forEach(({ bg, value }) => {
+      bg.clear().roundRect(-33, -17, 66, 34, 17).fill(value === chosen ? '#e8836a' : '#3e3959')
+    })
+    paint()
+    const start = new Container()
+    start.position.set(GAME_WIDTH / 2, top + 190)
+    start.addChild(new Graphics().roundRect(-92, -20, 184, 40, 20).fill('#f08a6a'), text('Start', 16, '#ffffff', '700'))
+    start.eventMode = 'static'
+    start.cursor = 'pointer'
+    start.on('pointertap', () => { this.audio.button(); this.startAuto(chosen) })
+    panel.addChild(start)
+    this.autoPanel = panel
+    this.addChildAt(panel, this.getChildIndex(this.modalLayer))
+  }
+
+  private closeAutoPanel() {
+    this.autoPanel?.destroy({ children: true })
+    this.autoPanel = undefined
   }
 
   private updateStatus() {

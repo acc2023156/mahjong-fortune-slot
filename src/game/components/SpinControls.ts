@@ -1,5 +1,5 @@
 import { Container, Graphics, Sprite } from 'pixi.js'
-import { skin, skinSprite, SpriteNumber } from '../skin'
+import { skin, skinSprite, softGlowTexture, SpriteNumber } from '../skin'
 
 export type SpinActions = {
   spin: () => void
@@ -29,9 +29,8 @@ export class SpinControls extends Container {
     const turbo = this.iconButton(56, actions.toggleTurbo)
     this.turboRing = turbo.ring
     this.turboIcon = skinSprite('icon_turbo_off', 30)
-    // The atlas bolt faces the wrong way; mirror it to match the reference TURBO icon.
-    this.turboIcon.scale.x *= -1
     turbo.button.addChild(this.turboIcon)
+    this.setTurbo(false)
 
     // −/+ sit symmetrically around the SPIN ring with an equal ~7px gap on both sides.
     const minus = this.iconButton(124, actions.decreaseBet)
@@ -44,7 +43,7 @@ export class SpinControls extends Container {
     this.counter.visible = false
     this.spinButton.position.set(215, ROW_Y)
     this.spinButton.addChild(this.spinFace, this.spinArrows, this.counter)
-    this.activate(this.spinButton, actions.spin)
+    this.activate(this.spinButton, () => { this.spinFlash(); actions.spin() })
     this.addChild(this.spinButton)
 
     const plus = this.iconButton(306, actions.increaseBet)
@@ -74,9 +73,44 @@ export class SpinControls extends Container {
     const ring = new Graphics()
     this.paintRing(ring, false)
     button.addChild(ring)
-    this.activate(button, action)
+    this.activate(button, () => { this.ripple(button); action() })
     this.addChild(button)
     return { button, ring }
+  }
+
+  /** Reference press feedback on the small buttons: a grey ring that swells and fades. */
+  private ripple(button: Container) {
+    const ring = new Graphics()
+    button.addChild(ring)
+    const start = performance.now()
+    const frame = () => {
+      if (ring.destroyed) return
+      const t = Math.min(1, (performance.now() - start) / 420)
+      ring.clear().circle(0, 0, 23 + 7 * t).stroke({ color: '#b8b0aa', width: 5 * (1 - t) + 1, alpha: .75 * (1 - t) })
+      if (t < 1) requestAnimationFrame(frame)
+      else ring.destroy()
+    }
+    requestAnimationFrame(frame)
+  }
+
+  /** Reference SPIN press: a bright jade-green glow bursts out of the button. */
+  private spinFlash() {
+    const glow = new Sprite(softGlowTexture())
+    glow.anchor.set(.5)
+    glow.blendMode = 'add'
+    glow.tint = 0x7dffb0
+    this.spinButton.addChildAt(glow, 0)
+    const start = performance.now()
+    const frame = () => {
+      if (glow.destroyed) return
+      const t = Math.min(1, (performance.now() - start) / 550)
+      const size = 130 + 90 * t
+      glow.setSize(size, size)
+      glow.alpha = t < .15 ? t / .15 : 1 - (t - .15) / .85
+      if (t < 1) requestAnimationFrame(frame)
+      else glow.destroy()
+    }
+    requestAnimationFrame(frame)
   }
 
   private paintRing(ring: Graphics, active: boolean) {
@@ -97,7 +131,7 @@ export class SpinControls extends Container {
     this.isSpinning = active
   }
 
-  /** Free spins show the jade square face with the remaining count, like the reference. */
+  /** Free spins and Auto Spin show the jade square face with the remaining count, like the reference. */
   setCounter(value: number | null) {
     const showCount = value !== null
     this.spinFace.texture = skin()[showCount ? 'spin_idle' : 'spin_round']
@@ -106,10 +140,15 @@ export class SpinControls extends Container {
     if (showCount) this.counter.text = String(value)
   }
 
+  /**
+   * Reference icons: off = struck-through bolt, on = outlined bolt, both with the tail at the
+   * bottom. The "off" art is stored rotated 90° in the atlas, so it is turned back upright.
+   */
   setTurbo(active: boolean) {
     this.turboIcon.texture = skin()[active ? 'icon_turbo_on' : 'icon_turbo_off']
+    this.turboIcon.rotation = active ? 0 : -Math.PI / 2
     const size = (active ? 22 : 30) / this.turboIcon.texture.width
-    this.turboIcon.scale.set(-size, size)
+    this.turboIcon.scale.set(size)
     this.turboIcon.tint = active ? 0xffe066 : 0xffffff
     this.paintRing(this.turboRing, active)
   }
