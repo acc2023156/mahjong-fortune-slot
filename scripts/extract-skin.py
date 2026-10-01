@@ -127,7 +127,9 @@ SEQUENCES = [
       (553, 33, 526, 240, 90), (21, 657, 510, 224, 90), (585, 361, 470, 200, 90), (97, 975, 352, 203, 90)], True),
     # 胡 scatter aura: blurred orange 胡 glow and radial light rays.
     ('hufx', FX_A + '22480547-c484-4511-a172-585e6db7c80a.bf7c4.jpg',
-     [(403, 158, 78, 84), (406, 7, 134, 136)], True),
+     [(403, 158, 78, 84), (406, 7, 134, 136),
+      # 2: glowing round Chinese longevity medallion under the 胡 (PDF 2.5 image 1)
+      (10, 8, 248, 229)], True),
     # Near-miss reel: thin gold frame, yellow light column, thin edge glow.
     ('nearmiss', FX_A + 'cb72e539-e2b7-41ce-9cac-e8e7c5e041e9.6bbc2.jpg',
      [(235, 280, 52, 324), (85, 345, 136, 286), (279, 604, 35, 254),
@@ -156,6 +158,33 @@ SEQUENCES = [
     ('hl', FX_A + '2ada7886-83e0-4d3c-b651-eae6ad6b5c7a.22e5d.jpg',
      [(165, 13, 78, 81), (260, 2, 72, 76), (34, 150, 172, 68)], True),
 ]
+
+
+# Simplified-Chinese versions of the text sprites (asset pack zh/ atlases), written to
+# public/assets/skin/zh/<same name>. Rects measured on gridded previews; the 共赢得 / 开始
+# art is stored lying on its side and is rotated upright.
+ZH = 'texture/'
+ZH_SPRITES = {
+    'title_ways': (ZH + 'info_message/zh/info_message.png', (0, 0, 436, 60), 0),
+    'msg_x5': (ZH + 'info_message/zh/info_message.png', (438, 0, 578, 60), 0),
+    'msg_ways': (ZH + 'info_message/zh/info_message.png', (1020, 0, 430, 60), 0),
+    'msg_scatter': (ZH + 'info_message/zh/info_message.png', (346, 62, 916, 76), 0),
+    'msg_gold': (ZH + 'info_message/zh/info_message.png', (1270, 60, 720, 86), 0),
+    'msg_free_x10': (ZH + 'info_message/zh/info_message.png', (6, 140, 936, 64), 0),
+    'label_total_win': (ZH + 'info_message/zh/info_message.png', (6, 62, 186, 72), 0),
+    'label_win': (ZH + 'info_message/zh/info_message.png', (198, 62, 140, 72), 0),
+    'label_remaining': (ZH + 'free_spins/zh/free_spins.png', (0, 0, 364, 188), 0),
+    'label_last_free': (ZH + 'free_spins/zh/free_spins.png', (410, 0, 581, 112), 0),
+    'title_total_win': (ZH + 'total_win/zh/total_win.png', (9, 148, 183, 443), 90),
+    'btn_collect': (ZH + 'total_win/zh/total_win.png', (0, 66, 152, 70), 0),
+    'title_big_win': (ZH + 'big_win/zh/big_win.png', (5, 5, 306, 178), 0),
+    'title_mega_win': (ZH + 'big_win/zh/big_win.png', (322, 5, 303, 185), 0),
+    'title_super_mega_win': (ZH + 'big_win/zh/big_win.png', (6, 200, 576, 202), 0),
+    'title_free_won': (ZH + 'bonus_loading/zh/bonus_loading.png', (5, 5, 654, 175), 0),
+    'label_doubled': (ZH + 'bonus_loading/zh/bonus_loading.png', (3, 187, 665, 88), 0),
+    'label_start': (ZH + 'bonus_loading/zh/bonus_loading.png', (664, 0, 74, 143), 90),
+    'text_wild': (ZH + 'symbols/zh/feature_symbols.png', (170, 5, 151, 92), 0),
+}
 
 
 def luminance_to_alpha(img):
@@ -197,8 +226,12 @@ def main():
             part = crop(source, [rect[:4]], rect[4] if len(rect) > 4 else 0)
             (luminance_to_alpha(part) if lum else part).save(OUT / f'{prefix}_{index}.png')
             frames += 1
+    zh_out = OUT / 'zh'
+    zh_out.mkdir(exist_ok=True)
+    for name, (atlas, rect, rotate) in ZH_SPRITES.items():
+        crop(atlas, [rect], rotate).save(zh_out / f'{name}.png')
     # The game loads WebP (~72% smaller than PNG); the PNGs stay as lossless sources.
-    for png in OUT.glob('*.png'):
+    for png in [*OUT.glob('*.png'), *zh_out.glob('*.png')]:
         Image.open(png).save(png.with_suffix('.webp'), 'WEBP', quality=86, method=6)
     print(f'wrote {len(SPRITES) + 2 * len(DIGITS) + frames} sprites (+ .webp) to {OUT}')
 

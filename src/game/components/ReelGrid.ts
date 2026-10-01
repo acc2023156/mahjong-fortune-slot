@@ -50,7 +50,7 @@ const NEAR_MISS_MS = 4040
 const NEAR_MISS_SPEED = .55
 
 type TileView = Container & {
-  tile: Sprite; aura: Container; halo: Sprite; rays: Sprite; flame: Sprite; glyph: Sprite; ingot: Sprite
+  tile: Sprite; aura: Container; halo: Sprite; rays: Sprite; flame: Sprite; medal: Sprite; glyph: Sprite; ingot: Sprite
   glow: Sprite; frame: Sprite; twinkles: Container
   nearMissBoost?: boolean
 }
@@ -150,7 +150,7 @@ export class ReelGrid extends Container {
     view.frame.blendMode = 'add'
     view.frame.visible = false
     // 胡 aura from the reference sheet: rotating light rays and a blurred orange 胡 flame behind the glyph.
-    const [flame, rays] = skin().frames.hufx
+    const [flame, rays, medal] = skin().frames.hufx
     view.aura = new Container()
     view.aura.position.set(CELL_WIDTH / 2, CELL_HEIGHT / 2 - 2)
     view.rays = new Sprite(rays)
@@ -167,7 +167,13 @@ export class ReelGrid extends Container {
     view.halo.blendMode = 'add'
     view.halo.tint = 0xffb347
     view.halo.setSize(CELL_WIDTH * 1.5, CELL_HEIGHT * 1.4)
-    view.aura.addChild(view.halo, view.rays, view.flame)
+    // Glowing round longevity medallion under the 胡 (original sheet; PDF 2.5 image 1).
+    view.medal = new Sprite(medal)
+    view.medal.anchor.set(.5)
+    view.medal.blendMode = 'add'
+    view.medal.setSize(CELL_WIDTH * 1.05, CELL_WIDTH * 1.05 * 229 / 248)
+    view.medal.y = 6
+    view.aura.addChild(view.halo, view.rays, view.medal, view.flame)
     view.aura.visible = false
     // WILD: faint white star points twinkling around the lettering and the ingot.
     view.twinkles = new Container()
@@ -359,25 +365,102 @@ export class ReelGrid extends Container {
     for (let row = 0; row < REEL_ROWS; row++) {
       if (this.rowState(row, col).symbol !== 'scatter') continue
       callbacks.sound('scatter', col)
-      const slot = row + 1
-      const x = this.baseX(col) + CELL_WIDTH / 2
-      const y = this.rowY(row) + CELL_HEIGHT / 2
-      // Round orange bloom (the rectangular hl glow showed hard square edges here).
-      const flare = new Sprite(softGlowTexture())
-      flare.anchor.set(.5)
-      flare.tint = 0xff8a2a
-      flare.blendMode = 'add'
-      flare.position.set(x, y)
-      this.fxLayer.addChild(flare)
-      this.playBurst(x, y, 130, 0xffa640)
-      this.tween(callbacks.turbo ? 260 : 520, (t) => {
-        flare.setSize(130 + t * 90, 130 + t * 90)
-        flare.alpha = 1 - t
-        const pop = 1 + Math.sin(t * Math.PI) * .22
-        this.place(col, slot, this.slotY(slot), pop)
-      }).then(() => flare.destroy())
+      void this.huEntrance(col, row + 1, callbacks.turbo)
     }
   }
+
+  /**
+   * 胡 entrance (Normal games and win.mp4, 23.4–24.1 s): the board darkens, the 胡 dips small
+   * then swells past full size inside a burst of flame light, a one-off spray of gold sparks
+   * shoots up and out, then everything settles and the board brightens again.
+   */
+  private async huEntrance(col: number, slot: number, turbo: boolean) {
+    const view = this.views[col][slot]
+    const x = this.baseX(col) + CELL_WIDTH / 2
+    const y = this.slotY(slot) + CELL_HEIGHT / 2
+    const duration = turbo ? 320 : 680
+    this.dim.visible = true
+    this.reelLayer.addChild(view)
+    const flame = new Sprite(skin().frames.hufx[0])
+    flame.anchor.set(.5)
+    flame.blendMode = 'add'
+    flame.position.set(x, y)
+    const bloom = new Sprite(softGlowTexture())
+    bloom.anchor.set(.5)
+    bloom.blendMode = 'add'
+    bloom.tint = 0xff8a2a
+    bloom.position.set(x, y)
+    this.fxLayer.addChild(bloom, flame)
+    this.sparkSpray(x, y, turbo ? 10 : 20)
+    await this.tween(duration, (t) => {
+      // Board darkness in and out.
+      this.dim.alpha = Math.max(.01, .6 * Math.sin(Math.min(1, t) * Math.PI))
+      // Scale: dip to .82, swell to 1.22, settle at 1.
+      const scale = t < .18 ? 1 - .18 * (t / .18)
+        : t < .45 ? .82 + .4 * ((t - .18) / .27)
+          : 1.22 - .22 * ((t - .45) / .55)
+      this.place(col, slot, this.slotY(slot), scale)
+      // Flame light flares with the swell, then fades.
+      const flare = t < .18 ? 0 : Math.max(0, 1 - (t - .18) / .82)
+      flame.setSize(CELL_WIDTH * (1.2 + .9 * (1 - flare)), CELL_HEIGHT * (1.25 + .8 * (1 - flare)))
+      flame.alpha = flare
+      bloom.setSize(150 + 110 * t, 150 + 110 * t)
+      bloom.alpha = .85 * flare
+    })
+    flame.destroy()
+    bloom.destroy()
+    this.place(col, slot, this.slotY(slot))
+    this.dim.visible = false
+    // A near miss may have started meanwhile; it keeps landed 胡 lifted above the board.
+    if (!this.nearMissLayer.visible) this.restoreLayering()
+  }
+
+  /** One-off spray of gold sparks shooting up and out of a landing 胡. */
+  private sparkSpray(x: number, y: number, count: number) {
+    for (let index = 0; index < count; index++) {
+      const spark = new Sprite(skin().star)
+      spark.anchor.set(.5)
+      spark.blendMode = 'add'
+      spark.tint = index % 3 ? 0xffd34a : 0xffffff
+      spark.position.set(x + (Math.random() - .5) * 20, y + (Math.random() - .5) * 20)
+      const angle = -Math.PI / 2 + (Math.random() - .5) * 2.2
+      const speed = 2.5 + Math.random() * 3.5
+      let vx = Math.cos(angle) * speed
+      let vy = Math.sin(angle) * speed
+      const size = .1 + Math.random() * .1
+      this.fxLayer.addChild(spark)
+      void this.tween(600 + Math.random() * 300, (t) => {
+        vy += .12
+        vx *= .97
+        spark.x += vx
+        spark.y += vy
+        spark.scale.set(size * (1 - t * .6))
+        spark.alpha = 1 - t
+      }).then(() => spark.destroy())
+    }
+  }
+
+  /** Idle gold mote rising slowly beside a settled 胡 (different direction from the landing spray). */
+  private idleMote(view: TileView) {
+    if (!view.visible || !view.parent) return
+    const origin = view.getGlobalPosition()
+    const local = this.fxLayer.toLocal(origin)
+    const mote = new Sprite(skin().star)
+    mote.anchor.set(.5)
+    mote.blendMode = 'add'
+    mote.tint = 0xffd34a
+    mote.position.set(local.x + 10 + Math.random() * (CELL_WIDTH - 20), local.y + CELL_HEIGHT * (.4 + Math.random() * .5))
+    const drift = (Math.random() - .5) * .3
+    const size = .05 + Math.random() * .06
+    this.fxLayer.addChild(mote)
+    void this.tween(900 + Math.random() * 500, (t) => {
+      mote.x += drift
+      mote.y -= .45
+      mote.scale.set(size * Math.sin(t * Math.PI))
+      mote.alpha = Math.sin(t * Math.PI)
+    }).then(() => mote.destroy())
+  }
+
 
   /**
    * Near-miss reel (reference near miss01.mp4), all from the original effect sheets:
@@ -798,6 +881,9 @@ export class ReelGrid extends Container {
         view.rays.alpha = .75 + Math.sin(now / 420) * .2
         view.flame.alpha = .95 + Math.sin(now / 160) * .05
         view.halo.alpha = .8 + Math.sin(now / 300) * .2
+        view.medal.alpha = .75 + Math.sin(now / 380) * .2
+        // Idle: a few gold motes drift up around every visible 胡 (reference, after landing).
+        if (Math.random() < .05) this.idleMote(view)
       }
       requestAnimationFrame(tick)
     }

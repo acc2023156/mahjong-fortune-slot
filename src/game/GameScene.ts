@@ -4,7 +4,7 @@ import { SpinControls } from './components/SpinControls'
 import { StatusPanel } from './components/StatusPanel'
 import { AudioEngine, IDLE_LINES } from './AudioEngine'
 import { freeSpinsForScatters, GAME_HEIGHT, GAME_WIDTH } from './config'
-import { skin, skinSprite, softGlowTexture, SpriteNumber, whenDeferredReady, type SkinName } from './skin'
+import { LANG, skin, skinSprite, softGlowTexture, SpriteNumber, whenDeferredReady, type SkinName } from './skin'
 
 const BOARD_Y = 112
 const PLAQUE_Y = 535
@@ -253,7 +253,8 @@ export class GameScene extends Container {
     const waysBar = new Sprite(textures.bar_ways)
     waysBar.setSize(GAME_WIDTH, 50)
     waysBar.y = 2
-    const ways = skinSprite('title_ways', 128)
+    // The Chinese title (1024 路中奖组合) is much longer than 1024 WAYS: size it by height instead.
+    const ways = LANG === 'zh' ? skinSprite('title_ways', undefined, 25) : skinSprite('title_ways', 128)
     ways.position.set(GAME_WIDTH / 2, 27)
     const multBar = new Sprite(textures.bar_mult)
     multBar.setSize(GAME_WIDTH, 64)

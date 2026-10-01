@@ -23,7 +23,7 @@ const SKIN_NAMES = [...CORE_NAMES, ...DEFERRED_NAMES] as const
 const DIGIT_KEYS = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'x', 'dot'] as const
 
 /** Effect frame sequences from the reference atlases, in playback order. */
-const SEQUENCE_LENGTHS = { turn: 6, burst: 9, coinspin: 8, tilefx: 8, hl: 3, hufx: 2, nearmiss: 5, nmflare: 1 } as const
+const SEQUENCE_LENGTHS = { turn: 6, burst: 9, coinspin: 8, tilefx: 8, hl: 3, hufx: 3, nearmiss: 5, nmflare: 1 } as const
 /** Feature-screen (Big Win / Free Spins / Total Win) art from the reference sheets; streamed after start-up. */
 const DEFERRED_SEQUENCE_LENGTHS = {
   bwpile: 3, bwlight: 3, rays: 1, fsui: 2, flycoin: 10, fsbg: 1, fsglow: 1, fsgold: 2,
@@ -41,8 +41,18 @@ type Skin = Record<SkinName, Texture> & {
 let loaded: Skin | undefined
 
 export const skinUrl = (path: string) => `${import.meta.env.BASE_URL}assets/${path}`
+/**
+ * UI language for the text sprites. Simplified Chinese (asset pack zh/ art, sliced into
+ * skin/zh/) is the default; `?lang=en` shows the original English art.
+ */
+export const LANG: 'zh' | 'en' = new URLSearchParams(location.search).get('lang') === 'en' ? 'en' : 'zh'
+const ZH_NAMES = new Set([
+  'title_ways', 'msg_x5', 'msg_ways', 'msg_scatter', 'msg_gold', 'msg_free_x10', 'label_total_win', 'label_win',
+  'label_remaining', 'label_last_free', 'title_total_win', 'btn_collect', 'title_big_win', 'title_mega_win',
+  'title_super_mega_win', 'title_free_won', 'label_doubled', 'label_start', 'text_wild',
+])
 /** Game textures ship as WebP (~72% smaller than the PNG sources in the same folder). */
-const skinFile = (file: string) => skinUrl(`skin/${file}.webp`)
+const skinFile = (file: string) => skinUrl(`skin/${LANG === 'zh' && ZH_NAMES.has(file) ? 'zh/' : ''}${file}.webp`)
 
 /**
  * Loads one texture, retrying transient network failures (slow CDN routes drop requests)
