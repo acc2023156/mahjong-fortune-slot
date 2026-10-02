@@ -794,50 +794,50 @@ export class ReelGrid extends Container {
     const winners = [...wins].map((key) => key.split(':').map(Number) as [number, number])
     const kept = new Set(winners.filter(([row, col]) => this.rowState(row, col).gold).map(([row, col]) => `${row}:${col}`))
     callbacks.sound('flip')
+    // Every winner — gold included — bursts coins and starts turning at the same moment.
+    for (const [row, col] of winners) {
+      this.coinBurst(this.baseX(col) + CELL_WIDTH / 2, this.rowY(row) + CELL_HEIGHT / 2, callbacks.turbo)
+    }
     const turnFrames = skin().frames.turn
     let lastFrame = -1
-    let burstFired = false
     await this.tween(duration, (t) => {
       // Turn animation from the reference sheet: face-on → teal side, one frame per step.
       const frame = Math.min(turnFrames.length - 1, Math.floor(t / .6 * turnFrames.length))
       const frameChanged = frame !== lastFrame
       lastFrame = frame
-      const fireBurst = !burstFired && t >= .5
-      if (fireBurst) burstFired = true
       for (const [row, col] of winners) {
         const view = this.views[col][row + 1]
-        if (kept.has(`${row}:${col}`)) {
-          view.glow.visible = true
-          view.glow.alpha = .25 + .55 * t
-          if (fireBurst) this.goldDust(this.baseX(col) + CELL_WIDTH / 2, this.rowY(row) + CELL_HEIGHT / 2, callbacks.turbo)
-          continue
-        }
+        const gold = kept.has(`${row}:${col}`)
         if (frameChanged && t < .6) {
           view.tile.texture = turnFrames[frame]
           view.tile.scale.set(ART_SCALE)
+          // The gold tile turns as a gold tile, wrapped in its glow.
+          view.tile.tint = gold ? 0xffd25a : 0xffffff
           // Keep the face glyph on the shrinking front face for the first frames, then hide it.
           view.glyph.visible = frame < 3
           view.glyph.scale.x = view.glyph.scale.y * (1 - frame * .14)
           view.glyph.x = CELL_WIDTH / 2 + frame * 3
         }
-        if (fireBurst) this.goldDust(this.baseX(col) + CELL_WIDTH / 2, this.rowY(row) + CELL_HEIGHT / 2, callbacks.turbo)
+        if (gold) {
+          view.glow.visible = true
+          view.glow.alpha = .5 + .4 * Math.min(1, t / .5)
+        }
         view.alpha = t < .6 ? 1 : Math.max(0, 1 - (t - .6) / .25)
       }
     })
     for (const [row, col] of winners) {
-      if (!kept.has(`${row}:${col}`)) this.views[col][row + 1].visible = false
+      const view = this.views[col][row + 1]
+      view.visible = false
+      view.tile.tint = 0xffffff
+      view.glow.visible = false
     }
     return kept
   }
 
   /**
-   * Every gold tile that was part of the win turns into a WILD ingot (flip + gold burst) on the
-   * cleared board, before the survivors and new tiles drop.
-   */
-  /**
-   * Normal games and win.mp4 3.96–4.02 s: right as the other winners vanish, each winning gold
-   * tile flares bright and the WILD with its ingot cross-fades in within a few frames, no
-   * squash or flip.
+   * Gold → WILD (Normal games and win.mp4 ~3.96–4.2 s, frame by frame): where the gold tile
+   * turned away a short full-cell gold flash fires, then a light burst, then the WILD and its
+   * ingot appear out of a quick blur; the ingot keeps glowing a moment after the WILD settles.
    */
   private async convertGold(goldStates: Set<CellState>, callbacks: ReelSpinCallbacks) {
     const targets: [number, number][] = []
@@ -846,43 +846,53 @@ export class ReelGrid extends Container {
     }
     if (!targets.length) return
     callbacks.sound('wild')
-    const glows = targets.map(([col, slot]) => {
+    const speed = callbacks.turbo ? .6 : 1
+    const cells = targets.map(([col, slot]) => {
+      const x = this.baseX(col) + CELL_WIDTH / 2
+      const y = this.slotY(slot) + CELL_HEIGHT / 2
+      // 1. Short full-cell gold flash.
+      const fill = new Graphics().roundRect(-CELL_WIDTH / 2, -CELL_HEIGHT / 2, CELL_WIDTH, CELL_HEIGHT, 8).fill('#ffd84a')
+      fill.blendMode = 'add'
+      fill.position.set(x, y)
+      fill.alpha = .9
+      this.fxLayer.addChild(fill)
+      return { col, slot, x, y, fill }
+    })
+    await this.tween(70 * speed, (t) => { cells.forEach(({ fill }) => { fill.alpha = Math.max(.01, .9 * (1 - t * .6)) }) })
+    // 2. Light burst; 3. WILD + ingot come out of a blur.
+    const blur = new BlurFilter({ strength: 8, quality: 2 })
+    const glows = cells.map(({ col, slot, x, y }) => {
+      this.playBurst(x, y, 130)
+      this.states[col][slot] = { symbol: 'wild', gold: false }
+      this.paint(col, slot)
+      const view = this.views[col][slot]
+      view.visible = true
+      view.alpha = .3
+      view.filters = [blur]
+      this.place(col, slot, this.slotY(slot))
       const glow = new Sprite(softGlowTexture())
       glow.anchor.set(.5)
       glow.blendMode = 'add'
-      glow.tint = 0xffe27a
-      glow.position.set(this.baseX(col) + CELL_WIDTH / 2, this.slotY(slot) + CELL_HEIGHT / 2)
-      glow.setSize(CELL_WIDTH * 1.5, CELL_HEIGHT * 1.4)
-      glow.alpha = .01
+      glow.tint = 0xffd34a
+      glow.position.set(x, y + CELL_HEIGHT * .18)
+      glow.setSize(CELL_WIDTH * 1.1, CELL_HEIGHT * .8)
       this.fxLayer.addChild(glow)
       return glow
     })
-    const swapAt = .3
-    let swapped = false
-    await this.tween(callbacks.turbo ? 160 : 240, (t) => {
-      // Flash peaks at the swap, then decays over the new WILD.
-      const flash = t < swapAt ? t / swapAt : 1 - (t - swapAt) / (1 - swapAt)
-      glows.forEach((glow) => { glow.alpha = Math.max(.01, flash) })
-      if (!swapped && t >= swapAt) {
-        swapped = true
-        for (const [col, slot] of targets) {
-          this.states[col][slot] = { symbol: 'wild', gold: false }
-          this.paint(col, slot)
-          this.views[col][slot].visible = true
-          this.place(col, slot, this.slotY(slot))
-          this.playBurst(this.baseX(col) + CELL_WIDTH / 2, this.slotY(slot) + CELL_HEIGHT / 2, 110)
-        }
-      }
-      // A few frames of cross-fade so the ingot never pops in.
-      for (const [col, slot] of targets) {
-        this.views[col][slot].alpha = swapped ? Math.min(1, .35 + (t - swapAt) / .25) : 1
-      }
+    await this.tween(110 * speed, (t) => {
+      cells.forEach(({ fill }) => { fill.alpha = Math.max(.01, .36 * (1 - t)) })
+      blur.strength = 8 * (1 - t)
+      for (const { col, slot } of cells) this.views[col][slot].alpha = .3 + .7 * t
     })
-    glows.forEach((glow) => glow.destroy())
-    for (const [col, slot] of targets) {
-      this.views[col][slot].alpha = 1
-      this.views[col][slot].glow.visible = false
-    }
+    cells.forEach(({ col, slot, fill }) => {
+      fill.destroy()
+      const view = this.views[col][slot]
+      view.filters = []
+      view.alpha = 1
+    })
+    // 4. The ingot's glow fades out on its own while the cascade continues.
+    void this.tween(420 * speed, (t) => { glows.forEach((glow) => { glow.alpha = Math.max(.01, 1 - t) }) })
+      .then(() => glows.forEach((glow) => glow.destroy()))
   }
 
   private async refill(wins: Set<string>, converted: Set<string>, callbacks: ReelSpinCallbacks) {
@@ -997,54 +1007,56 @@ export class ReelGrid extends Container {
    * Cleared tile → a quick glow, then fine gold dust scattered over the emptied felt that
    * twinkles and fades while the board waits for the refill (reference frame, 2026-09-30).
    */
-  private goldDust(x: number, y: number, turbo: boolean) {
-    const flash = new Sprite(softGlowTexture())
-    flash.anchor.set(.5)
-    flash.blendMode = 'add'
-    flash.tint = 0xffe070
-    flash.position.set(x, y)
-    this.fxLayer.addChild(flash)
-    void this.tween(turbo ? 160 : 300, (t) => {
-      flash.setSize(CELL_WIDTH * (1.1 + t * .5), CELL_HEIGHT * (1.1 + t * .4))
-      flash.alpha = .9 * (1 - t)
-    }).then(() => flash.destroy())
-    // PDF 2.3 image 3: a few spinning gold coins pop out of the tile and hover in place.
+  private coinBurst(x: number, y: number, turbo: boolean) {
+    const frames = skin().frames.tilefx
+    const fx = new AnimatedSprite(frames)
+    fx.anchor.set(.5)
+    fx.blendMode = 'add'
+    // The tile outline is ~289 px tall in every frame: match it to the cell.
+    fx.scale.set(CELL_HEIGHT * 1.05 / 289)
+    fx.animationSpeed = turbo ? .5 : .32
+    fx.loop = false
+    fx.position.set(x, y)
+    fx.onComplete = () => fx.destroy()
+    this.fxLayer.addChild(fx)
+    fx.play()
     const coinFrames = skin().frames.coinspin
-    for (let index = 0; index < (turbo ? 2 : 4); index++) {
+    for (let index = 0; index < (turbo ? 3 : 5); index++) {
       const coin = new AnimatedSprite(coinFrames)
       coin.anchor.set(.5)
-      coin.scale.set((11 + Math.random() * 7) / coinFrames[0].width)
-      coin.animationSpeed = .3 + Math.random() * .15
+      const size = (10 + Math.random() * 8) / coinFrames[0].width
+      coin.scale.set(size)
+      coin.animationSpeed = .35 + Math.random() * .2
       coin.gotoAndPlay(Math.floor(Math.random() * coinFrames.length))
-      const tx = x + (Math.random() - .5) * CELL_WIDTH * .8
-      const ty = y + (Math.random() - .5) * CELL_HEIGHT * .8
+      const angle = Math.random() * Math.PI * 2
+      const reach = CELL_WIDTH * (.6 + Math.random() * .6)
       coin.position.set(x, y)
+      coin.rotation = angle + Math.PI / 2
       this.fxLayer.addChild(coin)
-      void this.tween((turbo ? 450 : 1000) + Math.random() * 250, (t) => {
-        const ease = 1 - Math.pow(1 - Math.min(1, t / .3), 3)
-        coin.position.set(x + (tx - x) * ease, y + (ty - y) * ease - t * 6)
-        coin.alpha = t < .7 ? 1 : 1 - (t - .7) / .3
+      void this.tween((turbo ? 380 : 620) + Math.random() * 200, (t) => {
+        const ease = 1 - Math.pow(1 - t, 3)
+        coin.position.set(x + Math.cos(angle) * reach * ease, y + Math.sin(angle) * reach * ease)
+        // Stretched along its path while fast (motion blur), round once it slows.
+        coin.scale.set(size, size * (1 + 1.6 * (1 - ease)))
+        coin.alpha = t < .65 ? 1 : 1 - (t - .65) / .35
       }).then(() => coin.destroy())
     }
-    const count = turbo ? 18 : 40
+    const count = turbo ? 14 : 28
     for (let index = 0; index < count; index++) {
-      // Saturated gold dots drawn normally (additive washes out to pale green on the felt).
       const dot = new Sprite(dustDotTexture())
       dot.anchor.set(.5)
       dot.tint = [0xffd21f, 0xffb81a, 0xffe45c][index % 3]
-      const size = 3 + Math.random() * 6
-      dot.setSize(size, size)
-      dot.position.set(x + (Math.random() - .5) * CELL_WIDTH * 1.1, y + (Math.random() - .5) * CELL_HEIGHT * 1.1)
-      const vx = (Math.random() - .5) * .35
-      const vy = -.1 - Math.random() * .25
-      const phase = Math.random() * Math.PI * 2
-      const life = (turbo ? 500 : 1100) + Math.random() * 400
+      const size = 3 + Math.random() * 5
+      const angle = Math.random() * Math.PI * 2
+      const reach = CELL_WIDTH * (.4 + Math.random() * .9)
+      dot.position.set(x, y)
+      dot.rotation = angle
       this.fxLayer.addChild(dot)
-      void this.tween(life, (t, elapsed) => {
-        dot.x += vx
-        dot.y += vy
-        const twinkle = .65 + .35 * Math.sin(elapsed / 90 + phase)
-        dot.alpha = twinkle * (t < .15 ? t / .15 : 1 - (t - .15) / .85)
+      void this.tween((turbo ? 420 : 760) + Math.random() * 300, (t) => {
+        const ease = 1 - Math.pow(1 - t, 3)
+        dot.position.set(x + Math.cos(angle) * reach * ease, y + Math.sin(angle) * reach * ease)
+        dot.setSize(size * (1 + 2.2 * (1 - ease)), size)
+        dot.alpha = t < .7 ? 1 : 1 - (t - .7) / .3
       }).then(() => dot.destroy())
     }
   }
