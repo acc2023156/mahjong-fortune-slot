@@ -226,6 +226,16 @@ def main():
             part = crop(source, [rect[:4]], rect[4] if len(rect) > 4 else 0)
             (luminance_to_alpha(part) if lum else part).save(OUT / f'{prefix}_{index}.png')
             frames += 1
+    # Gold-yellow recolour of the 胡 longevity medallion (the sheet's glow edge is red):
+    # brightness keeps the pattern, colour runs from deep gold to pale yellow.
+    medal = Image.open(OUT / 'hufx_2.png').convert('RGBA')
+    px = medal.load()
+    for y in range(medal.height):
+        for x in range(medal.width):
+            r, g, b, a = px[x, y]
+            k = max(r, g, b) / 255 * 0.35 + min(r, g, b) / 255 * 0.65
+            px[x, y] = (255, round(176 + 74 * k), round(36 + 170 * k), a)
+    medal.save(OUT / 'hufx_3.png')
     zh_out = OUT / 'zh'
     zh_out.mkdir(exist_ok=True)
     for name, (atlas, rect, rotate) in ZH_SPRITES.items():

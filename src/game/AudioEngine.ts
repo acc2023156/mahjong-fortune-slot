@@ -113,6 +113,8 @@ export class AudioEngine {
     const key = `multiplier_${value}` as VoiceName
     if (key in voiceSprites) this.voice(key)
   }
+  /** Rail step cue only (free-game opening relabel, no spoken multiplier). */
+  railStep(level: 1 | 2 | 3) { this.sound(level === 1 ? 'multiplier1' : level === 2 ? 'multiplier2' : 'multiplier3') }
   /** Winning line call (VOX #8–15): the best-paying symbol of the cascade is announced. */
   cardCall(symbol: PayingSymbolId) { this.voice(CARD_CALLS[symbol]) }
   /** WILD took part in a win (VOX #16/#17): female and male "全中" take turns. */

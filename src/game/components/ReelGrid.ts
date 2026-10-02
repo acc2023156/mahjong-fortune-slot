@@ -154,7 +154,7 @@ export class ReelGrid extends Container {
     view.frame.blendMode = 'add'
     view.frame.visible = false
     // 胡 aura from the reference sheet: rotating light rays and a blurred orange 胡 flame behind the glyph.
-    const [flame, rays, medal] = skin().frames.hufx
+    const [flame, rays, , medal] = skin().frames.hufx
     view.aura = new Container()
     view.aura.position.set(CELL_WIDTH / 2, CELL_HEIGHT / 2 - 2)
     view.rays = new Sprite(rays)
@@ -169,14 +169,16 @@ export class ReelGrid extends Container {
     view.halo = new Sprite(softGlowTexture())
     view.halo.anchor.set(.5)
     view.halo.blendMode = 'add'
-    view.halo.tint = 0xffb347
+    view.halo.tint = 0xffc23a
     view.halo.setSize(CELL_WIDTH * 1.05, CELL_HEIGHT * 1.0)
     // Glowing round longevity medallion under the 胡 (original sheet; PDF 2.5 image 1).
     view.medal = new Sprite(medal)
     view.medal.anchor.set(.5)
-    // Normal blend keeps the gold pattern readable (additive washed it out to white).
+    // Gold-yellow recoloured medallion (hufx_3); normal blend keeps the pattern readable.
     view.medal.setSize(CELL_WIDTH * 1.02, CELL_WIDTH * 1.02 * 229 / 248)
     view.medal.y = 16
+    // The rotating starburst read as a big flashing particle on a settled 胡: kept off.
+    view.rays.visible = false
     view.aura.addChild(view.halo, view.rays, view.flame, view.medal)
     view.aura.visible = false
     // WILD: faint white star points twinkling around the lettering and the ingot.
@@ -229,7 +231,7 @@ export class ReelGrid extends Container {
       return
     }
     view.glyph.texture = textures[GLYPHS[state.symbol]]
-    if (state.symbol === 'scatter') this.fitGlyph(view.glyph, 70, 80, CELL_HEIGHT / 2 - 6)
+    if (state.symbol === 'scatter') this.fitGlyph(view.glyph, 80, 90, CELL_HEIGHT / 2 - 1)
     else this.fitGlyph(view.glyph, 52, state.gold ? 58 : 64, state.gold ? 40 : 42)
   }
 
@@ -658,14 +660,17 @@ export class ReelGrid extends Container {
         const [row, col] = key.split(':').map(Number)
         return this.rowState(row, col)
       }))
-      await this.pause(turbo ? 100 : 820)
+      // Normal games and win.mp4 1–10 s: once the winners have cleared, the winning gold
+      // tiles turn into WILD in place; the WILD then stays and falls with its column.
+      await this.pause(turbo ? 60 : 420)
+      await this.convertGold(goldStates, callbacks)
+      await this.pause(turbo ? 60 : 380)
       // Coins settle on the dark board, then the dim lifts and the rail advances before the drop.
       this.dim.visible = false
       this.restoreLayering()
       callbacks.advance(multiplierForTumble(tumble + 1, callbacks.freeMode))
       await this.pause(turbo ? 40 : 150)
       await this.refill(result.wins, kept, callbacks)
-      await this.convertGold(goldStates, callbacks)
       await this.pause(turbo ? 40 : 160)
 
       tumble++
@@ -723,7 +728,7 @@ export class ReelGrid extends Container {
   /**
    * Winning tiles turn edge-on and burst into gold coins and dust where they stand while the
    * rest of the board stays dimmed (PDF 2.3, image 3). Winning gold tiles are kept: they turn
-   * into WILD only after the new tiles have cascaded down (see convertGold).
+   * into WILD right after the clear, before the drop (see convertGold).
    * Returns the keys of the kept gold winners.
    */
   private async clearWinners(wins: Set<string>, callbacks: ReelSpinCallbacks) {
@@ -763,8 +768,8 @@ export class ReelGrid extends Container {
   }
 
   /**
-   * PDF 2.3: after the new symbols have cascaded down, every gold tile that was part of the
-   * previous round's win turns into a WILD ingot (flip + gold burst).
+   * Every gold tile that was part of the win turns into a WILD ingot (flip + gold burst) on the
+   * cleared board, before the survivors and new tiles drop.
    */
   private async convertGold(goldStates: Set<CellState>, callbacks: ReelSpinCallbacks) {
     const targets: [number, number][] = []

@@ -78,7 +78,7 @@ const featuresPage = `
     <h3>金色符號</h3>
     <div class="hp-flow">${tile('glyph_zhong', true)}<span>→</span>${wild}</div>
     <p>任何一局中，第 2、3 或 4 軸上的部分符號（百搭與 SCATTER 除外）可能以金色出現。</p>
-    <p>每一輪新符號落下補位後，上一輪參與中獎的金色符號會變成百搭符號。</p>
+    <p>參與中獎的金色符號與一般符號相同計算，消除後會原地變成百搭符號，再隨轉軸落下；百搭只有在參與中獎時才會被消除。</p>
   </section>
   <section>
     <h3>倍數</h3>

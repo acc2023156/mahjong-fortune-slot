@@ -678,9 +678,59 @@ export class GameScene extends Container {
     this.controls.visible = false
     this.freePanel.visible = true
     this.updateFreePanel()
-    // The rail relabels left to right: x1→x2, x2→x4, x3→x6, x5→x10.
-    FREE_STEPS.forEach((_, index) => window.setTimeout(() => this.flipRailLabel(index, true), index * 250))
-    window.setTimeout(() => this.spin(), FREE_STEPS.length * 250 + 500)
+    // FREE SPIN and near miss.mp4 10.9–12.4 s: the rail relabels left to right
+    // (x1→x2, x2→x4, x3→x6, x5→x10), each label inside its own gold flash burst.
+    FREE_STEPS.forEach((_, index) => window.setTimeout(() => {
+      this.railBurst(index)
+      this.flipRailLabel(index, true)
+      this.audio.railStep(Math.min(3, index + 1) as 1 | 2 | 3)
+    }, 250 + index * 230))
+    window.setTimeout(() => this.spin(), 250 + FREE_STEPS.length * 230 + 700)
+  }
+
+  /** Gold flash behind a relabelling rail label: bright core, wide glow, a ring of sparks. */
+  private railBurst(index: number) {
+    const label = this.multiplierSprites[index]
+    if (!label) return
+    const layer = new Container()
+    layer.position.copyFrom(label.position)
+    this.addChildAt(layer, this.getChildIndex(label))
+    const glow = new Sprite(softGlowTexture())
+    glow.anchor.set(.5)
+    glow.blendMode = 'add'
+    glow.tint = 0xffb020
+    const core = new Sprite(softGlowTexture())
+    core.anchor.set(.5)
+    core.blendMode = 'add'
+    core.tint = 0xfff2b0
+    layer.addChild(glow, core)
+    const sparks = Array.from({ length: 10 }, (_, n) => {
+      const spark = new Sprite(skin().star)
+      spark.anchor.set(.5)
+      spark.blendMode = 'add'
+      spark.tint = n % 2 ? 0xffd34a : 0xffffff
+      layer.addChild(spark)
+      const angle = n / 10 * Math.PI * 2 + Math.random() * .4
+      return { spark, angle, reach: 26 + Math.random() * 18 }
+    })
+    const start = performance.now()
+    const frame = () => {
+      const t = Math.min(1, (performance.now() - start) / 520)
+      const flash = t < .25 ? t / .25 : 1 - (t - .25) / .75
+      glow.setSize(90 + 50 * t, 60 + 30 * t)
+      glow.alpha = .95 * flash
+      core.setSize(50 + 20 * t, 34 + 12 * t)
+      core.alpha = flash
+      for (const { spark, angle, reach } of sparks) {
+        const r = reach * Math.sqrt(t)
+        spark.position.set(Math.cos(angle) * r, Math.sin(angle) * r * .6)
+        spark.scale.set(.08 * (1 - t) + .01)
+        spark.alpha = 1 - t
+      }
+      if (t < 1) requestAnimationFrame(frame)
+      else layer.destroy({ children: true })
+    }
+    requestAnimationFrame(frame)
   }
 
   private flipRailLabel(index: number, freeMode: boolean) {
@@ -697,7 +747,8 @@ export class GameScene extends Container {
         const active = index === 0
         sprite.tint = active ? 0xffffff : INACTIVE_TINT
       }
-      sprite.scale.set(base * Math.max(.05, Math.abs(Math.cos(t * Math.PI))), base)
+      const pop = 1 + .25 * Math.sin(t * Math.PI)
+      sprite.scale.set(base * pop * Math.max(.05, Math.abs(Math.cos(t * Math.PI))), base * pop)
       if (t < 1) requestAnimationFrame(frame)
       else sprite.scale.set((index === 0 ? 46 : 38) / sprite.texture.height)
     }
