@@ -43,7 +43,6 @@ const SLOTS = REEL_ROWS + 2
 const STRIP_HEIGHT = PITCH_Y * SLOTS
 /** Spinning tiles cycle through [STRIP_TOP, STRIP_TOP + STRIP_HEIGHT), fully hidden at the top end. */
 const STRIP_TOP = BOARD_HEIGHT - STRIP_HEIGHT
-const DIM_TINT = 0x505050
 /** Each near-miss reel spins this long (measured: consecutive near-miss cues 4.04 s apart). */
 const NEAR_MISS_MS = 4040
 /** Near-miss reels spin slowly enough to read the tiles. */
@@ -70,6 +69,13 @@ export class ReelGrid extends Container {
   private readonly blurs: BlurFilter[] = []
   private readonly dim = new Graphics().rect(0, 0, BOARD_WIDTH, BOARD_HEIGHT).fill('#000')
   private readonly fxLayer = new Container()
+  /** Near miss: black mask over the reels that have already stopped (landed 胡 sit above it). */
+  private readonly nearMissDim = new Graphics().rect(0, 0, BOARD_WIDTH, BOARD_HEIGHT).fill('#000')
+  /** 胡 cells whose entrance spray has played; only these get idle motes (cells move with refills). */
+  private settledHu = new WeakSet<CellState>()
+  private readonly motes = new Set<Sprite>()
+  private motesPaused = false
+  private entrances: Promise<void>[] = []
   private readonly nearMissLayer = new Container()
   private running = false
   private quickStopRequested = false
@@ -110,7 +116,8 @@ export class ReelGrid extends Container {
       }
     }
     // The dim sits between reels and highlighted tiles: highlighted tiles are raised above it.
-    this.reelLayer.addChild(...[...this.columns].reverse(), this.dim)
+    this.nearMissDim.visible = false
+    this.reelLayer.addChild(...[...this.columns].reverse(), this.dim, this.nearMissDim)
     this.nearMissLayer.visible = false
     this.buildNearMiss()
     const nearMissMask = new Graphics().rect(0, 0, BOARD_WIDTH, BOARD_HEIGHT).fill('#fff')
@@ -119,6 +126,23 @@ export class ReelGrid extends Container {
     this.fxLayer.mask = fxMask
     this.addChild(this.nearMissLayer, this.fxLayer, nearMissMask, fxMask)
     this.animateAuras()
+  }
+
+  /** Copy of the visible board (incl. peek rows), e.g. to bring it back after Free Spins. */
+  snapshot(): CellState[][] {
+    return this.states.map((column) => column.map((cell) => ({ ...cell })))
+  }
+
+  restore(board: CellState[][]) {
+    this.clearMotes()
+    for (let col = 0; col < REEL_COLUMNS; col++) for (let slot = 0; slot < SLOTS; slot++) {
+      this.states[col][slot] = { ...board[col][slot] }
+      if (this.states[col][slot].symbol === 'scatter') this.settledHu.add(this.states[col][slot])
+      this.paint(col, slot)
+      this.views[col][slot].visible = true
+      this.place(col, slot, this.slotY(slot))
+    }
+    this.restoreLayering()
   }
 
   quickStop() {
@@ -175,7 +199,7 @@ export class ReelGrid extends Container {
     view.medal = new Sprite(medal)
     view.medal.anchor.set(.5)
     // Gold-yellow recoloured medallion (hufx_3); normal blend keeps the pattern readable.
-    view.medal.setSize(CELL_WIDTH, CELL_HEIGHT)
+    view.medal.setSize(CELL_WIDTH * 1.34, CELL_HEIGHT * 1.38)
     view.medal.y = 2
     // Additive copy on top makes the pattern glow gold instead of reading as a pale disc.
     const shine = new Sprite(medal)
@@ -255,6 +279,9 @@ export class ReelGrid extends Container {
     if (this.running) return
     this.running = true
     this.quickStopRequested = false
+    this.settledHu = new WeakSet()
+    this.clearMotes()
+    this.entrances = []
     this.strips.setFreeMode(callbacks.freeMode)
     const outcome = this.makeOutcome(false)
     this.spinScatterCount = this.countScatters(outcome)
@@ -351,7 +378,10 @@ export class ReelGrid extends Container {
       if (hadNearMiss) callbacks.anticipation(false)
       callbacks.settle()
       // After a near miss the darkness lifts over ~0.3 s before the board is evaluated.
-      void this.hideNearMiss(hadNearMiss ? 300 : 0).then(() => this.runTumbles(callbacks))
+      // A landing 胡 finishes its entrance before any win is shown (reference).
+      void Promise.all(this.entrances)
+        .then(() => this.hideNearMiss(hadNearMiss ? 300 : 0))
+        .then(() => this.runTumbles(callbacks))
     }
     requestAnimationFrame(animate)
   }
@@ -377,7 +407,7 @@ export class ReelGrid extends Container {
     for (let row = 0; row < REEL_ROWS; row++) {
       if (this.rowState(row, col).symbol !== 'scatter') continue
       callbacks.sound('scatter', col)
-      void this.huEntrance(col, row + 1, callbacks.turbo)
+      this.entrances.push(this.huEntrance(col, row + 1, callbacks.turbo))
     }
   }
 
@@ -414,6 +444,8 @@ export class ReelGrid extends Container {
     })
     flame.destroy()
     this.place(col, slot, this.slotY(slot))
+    // Idle motes start only after the spray, once the 胡 has settled.
+    if (this.states[col][slot].symbol === 'scatter') this.settledHu.add(this.states[col][slot])
     this.dim.visible = false
     // A near miss may have started meanwhile; it keeps landed 胡 lifted above the board.
     if (!this.nearMissLayer.visible) this.restoreLayering()
@@ -445,7 +477,7 @@ export class ReelGrid extends Container {
     }
   }
 
-  /** Idle gold mote rising slowly beside a settled 胡 (different direction from the landing spray). */
+  /** Idle gold mote beside a settled 胡: small, fixed size, no movement — it fades in and out in place. */
   private idleMote(view: TileView) {
     if (!view.visible || !view.parent) return
     const origin = view.getGlobalPosition()
@@ -454,16 +486,24 @@ export class ReelGrid extends Container {
     mote.anchor.set(.5)
     mote.blendMode = 'add'
     mote.tint = 0xffd34a
-    mote.position.set(local.x + 10 + Math.random() * (CELL_WIDTH - 20), local.y + CELL_HEIGHT * (.4 + Math.random() * .5))
-    const drift = (Math.random() - .5) * .3
-    const size = .05 + Math.random() * .06
+    mote.position.set(local.x + 8 + Math.random() * (CELL_WIDTH - 16), local.y + 8 + Math.random() * (CELL_HEIGHT - 16))
+    mote.scale.set(.035 + Math.random() * .03)
+    mote.alpha = .01
     this.fxLayer.addChild(mote)
-    void this.tween(900 + Math.random() * 500, (t) => {
-      mote.x += drift
-      mote.y -= .45
-      mote.scale.set(size * Math.sin(t * Math.PI))
-      mote.alpha = Math.sin(t * Math.PI)
-    }).then(() => mote.destroy())
+    this.motes.add(mote)
+    void this.tween(700 + Math.random() * 500, (t) => {
+      if (mote.destroyed) return
+      mote.alpha = Math.max(.01, t < .3 ? t / .3 : 1 - (t - .3) / .7)
+    }).then(() => this.removeMote(mote))
+  }
+
+  private removeMote(mote: Sprite) {
+    this.motes.delete(mote)
+    if (!mote.destroyed) mote.destroy()
+  }
+
+  private clearMotes() {
+    for (const mote of [...this.motes]) this.removeMote(mote)
   }
 
   /**
@@ -571,9 +611,12 @@ export class ReelGrid extends Container {
     this.nearMissLayer.visible = true
     // Reference: the near-miss reel is not blurred, it just turns slowly enough to read.
     this.blurs[activeColumn].enabled = false
+    // Everything that has already landed goes under a black mask; landed 胡 are lifted above it.
+    this.nearMissDim.clear().rect(0, 0, this.baseX(activeColumn) - (PITCH_X - CELL_WIDTH) / 2, BOARD_HEIGHT).fill('#000')
+    this.nearMissDim.alpha = .62
+    this.nearMissDim.visible = true
     for (let col = 0; col < activeColumn; col++) for (let slot = 0; slot < SLOTS; slot++) {
       const scatter = this.states[col][slot].symbol === 'scatter'
-      this.views[col][slot].tint = scatter ? 0xffffff : DIM_TINT
       if (scatter) {
         // Only the round halo and rays grow; the flame art has a square JPG edge when enlarged.
         const view = this.views[col][slot]
@@ -594,16 +637,11 @@ export class ReelGrid extends Container {
       view.rays.scale.set(view.rays.scale.x / 1.15, view.rays.scale.y / 1.15)
     }
     this.restoreLayering()
-    const dimmed = this.views.flat().filter((view) => view.tint !== 0xffffff)
-    if (fadeMs > 0 && dimmed.length) {
-      const from = DIM_TINT & 0xff
-      await this.tween(fadeMs, (t) => {
-        const level = Math.round(from + (255 - from) * t)
-        const tint = (level << 16) | (level << 8) | level
-        dimmed.forEach((view) => { view.tint = tint })
-      })
+    if (fadeMs > 0 && this.nearMissDim.visible) {
+      const from = this.nearMissDim.alpha
+      await this.tween(fadeMs, (t) => { this.nearMissDim.alpha = Math.max(.01, from * (1 - t)) })
     }
-    for (const column of this.views) for (const view of column) view.tint = 0xffffff
+    this.nearMissDim.visible = false
   }
 
   // ---------------------------------------------------------------- evaluation
@@ -814,6 +852,16 @@ export class ReelGrid extends Container {
   }
 
   private async refill(wins: Set<string>, converted: Set<string>, callbacks: ReelSpinCallbacks) {
+    this.motesPaused = true
+    this.clearMotes()
+    try {
+      await this.dropTiles(wins, converted, callbacks)
+    } finally {
+      this.motesPaused = false
+    }
+  }
+
+  private async dropTiles(wins: Set<string>, converted: Set<string>, callbacks: ReelSpinCallbacks) {
     const starts: number[][] = []
     for (let col = 0; col < REEL_COLUMNS; col++) {
       // Winners are removed unless they just became WILD (former gold tiles stay).
@@ -887,7 +935,7 @@ export class ReelGrid extends Container {
   /** Keeps every visible 胡 aura alive: rays turn slowly, the flame flickers. */
   private animateAuras() {
     const tick = (now: number) => {
-      for (const column of this.views) for (const view of column) {
+      this.views.forEach((column, col) => column.forEach((view, slot) => {
         if (view.twinkles.visible) {
           view.twinkles.children.forEach((star, index) => {
             // Each point fades in and out on its own phase, small and subtle.
@@ -896,15 +944,15 @@ export class ReelGrid extends Container {
             star.rotation = now / 900 + index
           })
         }
-        if (!view.aura.visible) continue
+        if (!view.aura.visible) return
         view.rays.rotation = now / 2600
         view.rays.alpha = .25 + Math.sin(now / 420) * .08
         view.flame.alpha = .75 + Math.sin(now / 160) * .05
         view.halo.alpha = .5 + Math.sin(now / 300) * .08
         view.medal.alpha = .95 + Math.sin(now / 380) * .05
-        // Idle: a few gold motes drift up around every visible 胡 (reference, after landing).
-        if (Math.random() < .05) this.idleMote(view)
-      }
+        // Idle: gold motes twinkle around a settled 胡 (after its entrance spray, never while spinning).
+        if (!this.motesPaused && this.settledHu.has(this.states[col][slot]) && Math.random() < .05) this.idleMote(view)
+      }))
       requestAnimationFrame(tick)
     }
     requestAnimationFrame(tick)

@@ -223,6 +223,7 @@ export class GameScene extends Container {
   private freeSpinsRemaining = 0
   private freeGameWin = 0
   private readonly reels = new ReelGrid()
+  private baseBoard: ReturnType<ReelGrid['snapshot']> | undefined
   private readonly status = new StatusPanel()
   private readonly controls: SpinControls
   private readonly plaque = new WinPlaque()
@@ -412,6 +413,9 @@ export class GameScene extends Container {
           this.flashRail(next, freeMode)
         }
         railValue = next
+        // PDF 2.4: the WIN plaque turns jade-green as soon as the rail reaches its cap.
+        const cap = (freeMode ? FREE_STEPS : BASE_STEPS).at(-1)
+        if (next >= (cap ?? Infinity)) this.plaque.setMaxed(true)
       },
       sound: (event, index = 0) => {
         // research/VOX_0930.xlsx: TURBO stops all reels at once with its own cue (#26).
@@ -627,6 +631,8 @@ export class GameScene extends Container {
     this.controls.setAuto(false)
     this.freeSpinsRemaining = freeSpinsForScatters(scatterCount)
     this.freeGameWin = 0
+    // The board that triggered the feature comes back when Free Spins end.
+    this.baseBoard = this.reels.snapshot()
     this.audio.playMusic(true)
     // Feature-screen art streams in after start-up; wait for it if it is still on its way.
     whenDeferredReady(() => this.showFreeSpinsWon())
@@ -801,6 +807,8 @@ export class GameScene extends Container {
         this.audio.totalWinEnd()
         screen.addChild(this.screenButton('btn_collect', 678, () => {
           this.audio.collect()
+          if (this.baseBoard) this.reels.restore(this.baseBoard)
+          this.baseBoard = undefined
           this.closeScreen().then(() => this.exitFreeMode(total))
         }))
       }
