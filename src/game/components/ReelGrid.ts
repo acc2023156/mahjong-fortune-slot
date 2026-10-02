@@ -1,4 +1,4 @@
-import { AnimatedSprite, BlurFilter, Container, Graphics, Sprite, Texture } from 'pixi.js'
+import { AnimatedSprite, BlurFilter, Container, Graphics, Rectangle, Sprite, Texture } from 'pixi.js'
 import {
   PAYING_SYMBOLS, REEL_COLUMNS, REEL_ROWS,
   ReelStrips, SYMBOL_PAYS, multiplierForTumble, type CellState, type PayingSymbolId,
@@ -205,7 +205,7 @@ export class ReelGrid extends Container {
     const shine = new Sprite(medal)
     shine.anchor.set(.5)
     shine.blendMode = 'add'
-    shine.alpha = .5
+    shine.alpha = .18
     view.medal.addChild(shine)
     // The rotating starburst read as a big flashing particle on a settled 胡: kept off.
     view.rays.visible = false
@@ -477,7 +477,7 @@ export class ReelGrid extends Container {
     }
   }
 
-  /** Idle gold mote beside a settled 胡: small, fixed size, no movement — it fades in and out in place. */
+  /** Idle gold mote around a settled 胡: small and constant in size (no pop), rising slowly while it fades in and out. */
   private idleMote(view: TileView) {
     if (!view.visible || !view.parent) return
     const origin = view.getGlobalPosition()
@@ -486,14 +486,17 @@ export class ReelGrid extends Container {
     mote.anchor.set(.5)
     mote.blendMode = 'add'
     mote.tint = 0xffd34a
-    mote.position.set(local.x + 8 + Math.random() * (CELL_WIDTH - 16), local.y + 8 + Math.random() * (CELL_HEIGHT - 16))
-    mote.scale.set(.035 + Math.random() * .03)
+    mote.position.set(local.x + 10 + Math.random() * (CELL_WIDTH - 20), local.y + CELL_HEIGHT * (.35 + Math.random() * .55))
+    mote.scale.set(.045 + Math.random() * .03)
     mote.alpha = .01
+    const drift = (Math.random() - .5) * .25
     this.fxLayer.addChild(mote)
     this.motes.add(mote)
-    void this.tween(700 + Math.random() * 500, (t) => {
+    void this.tween(900 + Math.random() * 500, (t) => {
       if (mote.destroyed) return
-      mote.alpha = Math.max(.01, t < .3 ? t / .3 : 1 - (t - .3) / .7)
+      mote.x += drift
+      mote.y -= .35
+      mote.alpha = Math.max(.01, Math.sin(t * Math.PI))
     }).then(() => this.removeMote(mote))
   }
 
@@ -507,11 +510,19 @@ export class ReelGrid extends Container {
   }
 
   /**
-   * Near-miss reel (reference near miss01.mp4): a broad yellow light column runs the full reel
-   * height on the left boundary (warm orange spill over the neighbouring reel), a thinner one on
-   * the right, gold glitter twinkles inside them, and faint white speed lines race down the reel.
+   * Near-miss reel (reference near miss01.mp4): on the boundary with the stopped reel to the left
+   * a bright edge line stands the full reel height, and the original light-speed streak art and a
+   * warm flare spread sideways over the right half of that stopped reel (not over the near-miss
+   * reel). Gold sparks drift out to the left; the right boundary has a thin light line.
    */
   private buildNearMiss() {
+    const [, streak] = skin().frames.nearmiss
+    const [flareTexture] = skin().frames.nmflare
+    // Left half of a symmetric effect: its light only spreads leftwards, away from the reel.
+    const leftHalf = (texture: Texture) => new Texture({
+      source: texture.source,
+      frame: new Rectangle(texture.frame.x, texture.frame.y, texture.frame.width / 2, texture.frame.height),
+    })
     const strip = (stops: [number, string][]) => {
       const canvas = document.createElement('canvas')
       canvas.width = 64
@@ -523,78 +534,72 @@ export class ReelGrid extends Container {
       context.fillRect(0, 0, 64, 4)
       return Texture.from(canvas)
     }
-    const glowTexture = strip([[0, 'rgba(255,170,40,0)'], [.25, 'rgba(255,200,60,.75)'], [.5, 'rgba(255,250,210,1)'], [.75, 'rgba(255,200,60,.75)'], [1, 'rgba(255,170,40,0)']])
-    const spillTexture = strip([[0, 'rgba(255,90,20,0)'], [.75, 'rgba(255,130,30,.8)'], [1, 'rgba(255,160,40,.2)']])
+    const lineTexture = strip([[0, 'rgba(255,190,50,0)'], [.35, 'rgba(255,210,80,.8)'], [.5, 'rgba(255,252,220,1)'], [.65, 'rgba(255,210,80,.8)'], [1, 'rgba(255,190,50,0)']])
     const gap = PITCH_X - CELL_WIDTH
-    const makeColumn = (x: number, width: number, spill: boolean) => {
-      const column = new Container()
-      column.x = x
-      if (spill) {
-        const warm = new Sprite(spillTexture)
-        warm.blendMode = 'add'
-        warm.setSize(CELL_WIDTH * .45, BOARD_HEIGHT)
-        warm.x = -CELL_WIDTH * .45 + 4
-        column.addChild(warm)
-      }
-      const glow = new Sprite(glowTexture)
-      glow.blendMode = 'add'
-      glow.anchor.set(.5, 0)
-      glow.setSize(width, BOARD_HEIGHT)
-      const core = new Sprite(glowTexture)
-      core.blendMode = 'add'
-      core.anchor.set(.5, 0)
-      core.setSize(width * .45, BOARD_HEIGHT)
-      column.addChild(glow, core)
-      this.nearMissLayer.addChild(column)
-      return { column, width }
+    const spread = CELL_WIDTH * .55
+    const left = new Container()
+    left.x = -gap / 2
+    const warm = new Sprite(leftHalf(flareTexture))
+    warm.anchor.set(1, 0)
+    warm.blendMode = 'add'
+    warm.setSize(spread, BOARD_HEIGHT)
+    left.addChild(warm)
+    // Streak art tiled down the boundary and scrolled so the light races along the reel.
+    const streakHalf = leftHalf(streak)
+    const tileHeight = BOARD_HEIGHT / 2
+    const streaks = Array.from({ length: 3 }, () => {
+      const sprite = new Sprite(streakHalf)
+      sprite.anchor.set(1, 0)
+      sprite.blendMode = 'add'
+      sprite.setSize(spread, tileHeight)
+      left.addChild(sprite)
+      return sprite
+    })
+    const makeLine = (x: number, width: number) => {
+      const line = new Sprite(lineTexture)
+      line.anchor.set(.5, 0)
+      line.blendMode = 'add'
+      line.setSize(width, BOARD_HEIGHT)
+      line.x = x
+      return line
     }
-    const columns = [makeColumn(-gap / 2, 36, true), makeColumn(CELL_WIDTH + gap / 2, 16, false)]
-    // Faint white speed lines over the reel face, gold glitter inside the light columns.
-    const moteLayer = new Container()
-    this.nearMissLayer.addChild(moteLayer)
-    type Mote = { sprite: Container; vy: number; life: number; age: number; line: boolean }
-    const motes: Mote[] = []
+    left.addChild(makeLine(0, 14))
+    const right = makeLine(CELL_WIDTH + gap / 2, 10)
+    this.nearMissLayer.addChild(left, right)
+    const sparkLayer = new Container()
+    this.nearMissLayer.addChild(sparkLayer)
+    const sparks: { sprite: Sprite; vx: number; life: number; age: number }[] = []
+    let offset = 0
     let last = performance.now()
     const tick = (now: number) => {
       const dt = Math.min(50, now - last)
       last = now
       if (this.nearMissLayer.visible) {
-        columns.forEach(({ column }, index) => {
-          column.alpha = .85 + Math.sin(now / 90 + index * 2) * .15
-        })
+        offset = (offset + dt * .45) % tileHeight
+        streaks.forEach((sprite, index) => { sprite.y = offset + (index - 1) * tileHeight })
+        const pulse = .85 + Math.sin(now / 90) * .15
+        left.alpha = pulse
+        right.alpha = .7 + Math.sin(now / 90 + 2) * .15
         if (Math.random() < .5) {
-          const length = 18 + Math.random() * 50
-          const line = new Graphics().rect(0, 0, 1.2, length).fill('#ffffff')
-          line.blendMode = 'add'
-          line.position.set(4 + Math.random() * (CELL_WIDTH - 8), -length + Math.random() * BOARD_HEIGHT * .6)
-          moteLayer.addChild(line)
-          motes.push({ sprite: line, vy: 1.4 + Math.random() * .8, life: 260 + Math.random() * 200, age: 0, line: true })
-        }
-        if (Math.random() < .6) {
-          const { column, width } = columns[Math.random() < .7 ? 0 : 1]
-          const dot = new Sprite(skin().star)
-          dot.anchor.set(.5)
-          dot.blendMode = 'add'
-          dot.tint = Math.random() < .5 ? 0xffe27a : 0xffffff
-          dot.position.set(column.x + (Math.random() - .5) * width * .8, Math.random() * BOARD_HEIGHT)
-          moteLayer.addChild(dot)
-          motes.push({ sprite: dot, vy: .15 + Math.random() * .2, life: 300 + Math.random() * 300, age: 0, line: false })
+          const sprite = new Sprite(skin().star)
+          sprite.anchor.set(.5)
+          sprite.blendMode = 'add'
+          sprite.tint = Math.random() < .5 ? 0xffd34a : 0xffffff
+          sprite.position.set(left.x - Math.random() * 6, Math.random() * BOARD_HEIGHT)
+          sprite.scale.set(.03 + Math.random() * .03)
+          sparkLayer.addChild(sprite)
+          sparks.push({ sprite, vx: -(.02 + Math.random() * .05), life: 350 + Math.random() * 300, age: 0 })
         }
       }
-      for (let index = motes.length - 1; index >= 0; index--) {
-        const mote = motes[index]
-        mote.age += dt
-        mote.sprite.y += mote.vy * dt
-        const t = mote.age / mote.life
-        const wave = Math.sin(Math.min(1, t) * Math.PI)
-        if (mote.line) mote.sprite.alpha = .35 * wave
-        else {
-          mote.sprite.alpha = wave
-          mote.sprite.scale.set(.05 * wave + .005)
-        }
+      for (let index = sparks.length - 1; index >= 0; index--) {
+        const spark = sparks[index]
+        spark.age += dt
+        spark.sprite.x += spark.vx * dt
+        const t = spark.age / spark.life
+        spark.sprite.alpha = Math.max(0, 1 - t)
         if (t >= 1 || !this.nearMissLayer.visible) {
-          mote.sprite.destroy()
-          motes.splice(index, 1)
+          spark.sprite.destroy()
+          sparks.splice(index, 1)
         }
       }
       requestAnimationFrame(tick)
@@ -613,7 +618,7 @@ export class ReelGrid extends Container {
     this.blurs[activeColumn].enabled = false
     // Everything that has already landed goes under a black mask; landed 胡 are lifted above it.
     this.nearMissDim.clear().rect(0, 0, this.baseX(activeColumn) - (PITCH_X - CELL_WIDTH) / 2, BOARD_HEIGHT).fill('#000')
-    this.nearMissDim.alpha = .62
+    this.nearMissDim.alpha = .7
     this.nearMissDim.visible = true
     for (let col = 0; col < activeColumn; col++) for (let slot = 0; slot < SLOTS; slot++) {
       const scatter = this.states[col][slot].symbol === 'scatter'
@@ -621,7 +626,8 @@ export class ReelGrid extends Container {
         // Only the round halo and rays grow; the flame art has a square JPG edge when enlarged.
         const view = this.views[col][slot]
         view.halo.scale.set(view.halo.scale.x * 1.15, view.halo.scale.y * 1.15)
-        view.rays.scale.set(view.rays.scale.x * 1.15, view.rays.scale.y * 1.15)
+        view.rays.scale.set(view.rays.scale.x * 1.5, view.rays.scale.y * 1.5)
+        view.rays.visible = true
         view.nearMissBoost = true
         this.reelLayer.addChild(this.views[col][slot])
       }
@@ -634,7 +640,8 @@ export class ReelGrid extends Container {
       if (!view.nearMissBoost) continue
       view.nearMissBoost = false
       view.halo.scale.set(view.halo.scale.x / 1.15, view.halo.scale.y / 1.15)
-      view.rays.scale.set(view.rays.scale.x / 1.15, view.rays.scale.y / 1.15)
+      view.rays.scale.set(view.rays.scale.x / 1.5, view.rays.scale.y / 1.5)
+      view.rays.visible = false
     }
     this.restoreLayering()
     if (fadeMs > 0 && this.nearMissDim.visible) {
@@ -693,7 +700,11 @@ export class ReelGrid extends Container {
       total += result.payout * multiplier
       callbacks.tumble(tumble + 1, multiplier, result.payout * multiplier, result.symbols, result.wild)
 
+      // Reference: highlight ~0.9 s → the dim lifts → winners turn and clear (~0.33 s) on the bright
+      // board → winning gold turns WILD ~0.07 s later → ~0.9 s hold → rail steps up → ~0.2 s → drop.
       await this.highlightWinners(result.wins, callbacks)
+      await this.tween(turbo ? 40 : 80, (t) => { this.dim.alpha = Math.max(.01, .55 * (1 - t)) })
+      this.dim.visible = false
       const kept = await this.clearWinners(result.wins, callbacks)
       // Remember the kept gold tiles by identity: the refill moves them down their column.
       const goldStates = new Set([...kept].map((key) => {
@@ -702,14 +713,12 @@ export class ReelGrid extends Container {
       }))
       // Normal games and win.mp4 1–10 s: once the winners have cleared, the winning gold
       // tiles turn into WILD in place; the WILD then stays and falls with its column.
-      await this.pause(turbo ? 60 : 420)
+      await this.pause(turbo ? 30 : 70)
       await this.convertGold(goldStates, callbacks)
-      await this.pause(turbo ? 60 : 380)
-      // Coins settle on the dark board, then the dim lifts and the rail advances before the drop.
-      this.dim.visible = false
+      await this.pause(turbo ? 200 : 750)
       this.restoreLayering()
       callbacks.advance(multiplierForTumble(tumble + 1, callbacks.freeMode))
-      await this.pause(turbo ? 40 : 150)
+      await this.pause(turbo ? 60 : 200)
       await this.refill(result.wins, kept, callbacks)
       await this.pause(turbo ? 40 : 160)
 
@@ -724,8 +733,8 @@ export class ReelGrid extends Container {
   }
 
   private highlightWinners(wins: Set<string>, callbacks: ReelSpinCallbacks) {
-    const stagger = callbacks.turbo ? 70 : 170
-    const hold = callbacks.turbo ? 380 : 900
+    const stagger = callbacks.turbo ? 60 : 150
+    const hold = callbacks.turbo ? 340 : 650
     const lastCol = Math.max(...[...wins].map((key) => Number(key.split(':')[1])))
     const duration = lastCol * stagger + hold
     const lit = new Set<number>()
@@ -781,7 +790,7 @@ export class ReelGrid extends Container {
    * Returns the keys of the kept gold winners.
    */
   private async clearWinners(wins: Set<string>, callbacks: ReelSpinCallbacks) {
-    const duration = callbacks.turbo ? 260 : 540
+    const duration = callbacks.turbo ? 240 : 360
     const winners = [...wins].map((key) => key.split(':').map(Number) as [number, number])
     const kept = new Set(winners.filter(([row, col]) => this.rowState(row, col).gold).map(([row, col]) => `${row}:${col}`))
     callbacks.sound('flip')
@@ -843,7 +852,7 @@ export class ReelGrid extends Container {
       this.playBurst(glow.x, glow.y, 120)
       return glow
     })
-    await this.tween(callbacks.turbo ? 200 : 380, (t) => {
+    await this.tween(callbacks.turbo ? 140 : 200, (t) => {
       for (const [col, slot] of targets) this.views[col][slot].alpha = Math.max(.01, t)
       glows.forEach((glow) => { glow.alpha = Math.max(.01, Math.sin(t * Math.PI)) })
     })
@@ -945,10 +954,10 @@ export class ReelGrid extends Container {
           })
         }
         if (!view.aura.visible) return
-        view.rays.rotation = now / 2600
-        view.rays.alpha = .25 + Math.sin(now / 420) * .08
+        view.rays.rotation = now / (view.nearMissBoost ? 900 : 2600)
+        view.rays.alpha = view.nearMissBoost ? .85 + Math.sin(now / 200) * .1 : .25
         view.flame.alpha = .75 + Math.sin(now / 160) * .05
-        view.halo.alpha = .5 + Math.sin(now / 300) * .08
+        view.halo.alpha = .32 + Math.sin(now / 300) * .06
         view.medal.alpha = .95 + Math.sin(now / 380) * .05
         // Idle: gold motes twinkle around a settled 胡 (after its entrance spray, never while spinning).
         if (!this.motesPaused && this.settledHu.has(this.states[col][slot]) && Math.random() < .05) this.idleMote(view)
