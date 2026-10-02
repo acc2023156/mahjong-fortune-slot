@@ -381,7 +381,6 @@ export class GameScene extends Container {
     this.controls.setSpinning(true)
     this.updateStatus()
     this.setMultiplier(freeMode ? 2 : 1, freeMode)
-    let railValue = freeMode ? 2 : 1
     let winHasWild = false
     const turbo = this.turbo
     this.reels.spin({
@@ -406,13 +405,10 @@ export class GameScene extends Container {
       },
       advance: (next) => {
         this.setMultiplier(next, freeMode)
-        // Rail cue + spoken multiplier only when the value actually steps up (x5 / x10 cap repeats silently).
-        if (next !== railValue) {
-          const steps: readonly number[] = freeMode ? FREE_STEPS : BASE_STEPS
-          this.audio.multiplier(next, Math.max(1, Math.min(3, steps.indexOf(next))) as 1 | 2 | 3)
-          this.flashRail(next, freeMode)
-        }
-        railValue = next
+        // Rail cue + spoken multiplier on every step, including each further cascade at the cap.
+        const steps: readonly number[] = freeMode ? FREE_STEPS : BASE_STEPS
+        this.audio.multiplier(next, Math.max(1, Math.min(3, steps.indexOf(next))) as 1 | 2 | 3)
+        this.flashRail(next, freeMode)
         // PDF 2.4: the WIN plaque turns jade-green as soon as the rail reaches its cap.
         const cap = (freeMode ? FREE_STEPS : BASE_STEPS).at(-1)
         if (next >= (cap ?? Infinity)) this.plaque.setMaxed(true)

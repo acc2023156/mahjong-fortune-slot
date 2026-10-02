@@ -28,8 +28,9 @@ export const BOARD_HEIGHT = 392
 // Cells are the cream tile faces, which touch horizontally like the reference. The tile art
 // (159x188) carries an ~8px teal side strip on the left and a depth edge at the bottom; those
 // tuck under the neighbouring tile so no seam shows.
-const PITCH_X = 80.5
-const CELL_WIDTH = PITCH_X
+const CELL_WIDTH = 80.5
+/** One pixel of felt between neighbouring reels. */
+const PITCH_X = CELL_WIDTH + 1
 const ART_SCALE = CELL_WIDTH / 149
 const CELL_HEIGHT = 169 * ART_SCALE
 /** Art-space centre of the tile image mapped into cell space (face starts at art x=8, y=2). */
@@ -713,7 +714,6 @@ export class ReelGrid extends Container {
       }))
       // Normal games and win.mp4 1–10 s: once the winners have cleared, the winning gold
       // tiles turn into WILD in place; the WILD then stays and falls with its column.
-      await this.pause(turbo ? 30 : 70)
       await this.convertGold(goldStates, callbacks)
       await this.pause(turbo ? 200 : 750)
       this.restoreLayering()
@@ -806,6 +806,12 @@ export class ReelGrid extends Container {
       if (fireBurst) burstFired = true
       for (const [row, col] of winners) {
         const view = this.views[col][row + 1]
+        if (kept.has(`${row}:${col}`)) {
+          view.glow.visible = true
+          view.glow.alpha = .25 + .55 * t
+          if (fireBurst) this.goldDust(this.baseX(col) + CELL_WIDTH / 2, this.rowY(row) + CELL_HEIGHT / 2, callbacks.turbo)
+          continue
+        }
         if (frameChanged && t < .6) {
           view.tile.texture = turnFrames[frame]
           view.tile.scale.set(ART_SCALE)
@@ -818,13 +824,20 @@ export class ReelGrid extends Container {
         view.alpha = t < .6 ? 1 : Math.max(0, 1 - (t - .6) / .25)
       }
     })
-    for (const [row, col] of winners) this.views[col][row + 1].visible = false
+    for (const [row, col] of winners) {
+      if (!kept.has(`${row}:${col}`)) this.views[col][row + 1].visible = false
+    }
     return kept
   }
 
   /**
    * Every gold tile that was part of the win turns into a WILD ingot (flip + gold burst) on the
    * cleared board, before the survivors and new tiles drop.
+   */
+  /**
+   * Normal games and win.mp4 3.96–4.02 s: right as the other winners vanish, each winning gold
+   * tile flares bright and the WILD with its ingot cross-fades in within a few frames, no
+   * squash or flip.
    */
   private async convertGold(goldStates: Set<CellState>, callbacks: ReelSpinCallbacks) {
     const targets: [number, number][] = []
@@ -833,31 +846,43 @@ export class ReelGrid extends Container {
     }
     if (!targets.length) return
     callbacks.sound('wild')
-    // Normal games and win.mp4 4.0–4.3 s: the WILD fades in where the gold tile was cleared,
-    // inside a gold glow — no flip or squash.
     const glows = targets.map(([col, slot]) => {
-      this.states[col][slot] = { symbol: 'wild', gold: false }
-      this.paint(col, slot)
-      const view = this.views[col][slot]
-      view.visible = true
-      view.alpha = .01
-      this.place(col, slot, this.slotY(slot))
       const glow = new Sprite(softGlowTexture())
       glow.anchor.set(.5)
       glow.blendMode = 'add'
-      glow.tint = 0xffd34a
+      glow.tint = 0xffe27a
       glow.position.set(this.baseX(col) + CELL_WIDTH / 2, this.slotY(slot) + CELL_HEIGHT / 2)
-      glow.setSize(CELL_WIDTH * 1.4, CELL_HEIGHT * 1.3)
+      glow.setSize(CELL_WIDTH * 1.5, CELL_HEIGHT * 1.4)
+      glow.alpha = .01
       this.fxLayer.addChild(glow)
-      this.playBurst(glow.x, glow.y, 120)
       return glow
     })
-    await this.tween(callbacks.turbo ? 140 : 200, (t) => {
-      for (const [col, slot] of targets) this.views[col][slot].alpha = Math.max(.01, t)
-      glows.forEach((glow) => { glow.alpha = Math.max(.01, Math.sin(t * Math.PI)) })
+    const swapAt = .3
+    let swapped = false
+    await this.tween(callbacks.turbo ? 160 : 240, (t) => {
+      // Flash peaks at the swap, then decays over the new WILD.
+      const flash = t < swapAt ? t / swapAt : 1 - (t - swapAt) / (1 - swapAt)
+      glows.forEach((glow) => { glow.alpha = Math.max(.01, flash) })
+      if (!swapped && t >= swapAt) {
+        swapped = true
+        for (const [col, slot] of targets) {
+          this.states[col][slot] = { symbol: 'wild', gold: false }
+          this.paint(col, slot)
+          this.views[col][slot].visible = true
+          this.place(col, slot, this.slotY(slot))
+          this.playBurst(this.baseX(col) + CELL_WIDTH / 2, this.slotY(slot) + CELL_HEIGHT / 2, 110)
+        }
+      }
+      // A few frames of cross-fade so the ingot never pops in.
+      for (const [col, slot] of targets) {
+        this.views[col][slot].alpha = swapped ? Math.min(1, .35 + (t - swapAt) / .25) : 1
+      }
     })
     glows.forEach((glow) => glow.destroy())
-    for (const [col, slot] of targets) this.views[col][slot].alpha = 1
+    for (const [col, slot] of targets) {
+      this.views[col][slot].alpha = 1
+      this.views[col][slot].glow.visible = false
+    }
   }
 
   private async refill(wins: Set<string>, converted: Set<string>, callbacks: ReelSpinCallbacks) {
