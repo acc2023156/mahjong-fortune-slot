@@ -1,4 +1,4 @@
-import { AnimatedSprite, BlurFilter, Container, Graphics, Sprite } from 'pixi.js'
+import { AnimatedSprite, BlurFilter, Container, Graphics, Sprite, Texture } from 'pixi.js'
 import {
   PAYING_SYMBOLS, REEL_COLUMNS, REEL_ROWS,
   ReelStrips, SYMBOL_PAYS, multiplierForTumble, type CellState, type PayingSymbolId,
@@ -170,13 +170,19 @@ export class ReelGrid extends Container {
     view.halo.anchor.set(.5)
     view.halo.blendMode = 'add'
     view.halo.tint = 0xffc23a
-    view.halo.setSize(CELL_WIDTH * 1.05, CELL_HEIGHT * 1.0)
+    view.halo.setSize(CELL_WIDTH * 1.2, CELL_HEIGHT * 1.15)
     // Glowing round longevity medallion under the 胡 (original sheet; PDF 2.5 image 1).
     view.medal = new Sprite(medal)
     view.medal.anchor.set(.5)
     // Gold-yellow recoloured medallion (hufx_3); normal blend keeps the pattern readable.
-    view.medal.setSize(CELL_WIDTH * 1.02, CELL_WIDTH * 1.02 * 229 / 248)
-    view.medal.y = 16
+    view.medal.setSize(CELL_WIDTH, CELL_HEIGHT)
+    view.medal.y = 2
+    // Additive copy on top makes the pattern glow gold instead of reading as a pale disc.
+    const shine = new Sprite(medal)
+    shine.anchor.set(.5)
+    shine.blendMode = 'add'
+    shine.alpha = .5
+    view.medal.addChild(shine)
     // The rotating starburst read as a big flashing particle on a settled 胡: kept off.
     view.rays.visible = false
     view.aura.addChild(view.halo, view.rays, view.flame, view.medal)
@@ -413,124 +419,142 @@ export class ReelGrid extends Container {
     if (!this.nearMissLayer.visible) this.restoreLayering()
   }
 
-  /** One-off spray of gold sparks shooting up and out of a landing 胡. */
+  /**
+   * One-off spray of gold sparks bursting toward the camera from a landing 胡: they fly out
+   * radially a short way and grow as they come closer, then fade (no gravity).
+   */
   private sparkSpray(x: number, y: number, count: number) {
     for (let index = 0; index < count; index++) {
       const spark = new Sprite(skin().star)
       spark.anchor.set(.5)
       spark.blendMode = 'add'
       spark.tint = index % 3 ? 0xffd34a : 0xffffff
-      spark.position.set(x + (Math.random() - .5) * 20, y + (Math.random() - .5) * 20)
-      const angle = -Math.PI / 2 + (Math.random() - .5) * 2.2
-      const speed = 1 + Math.random() * 1.6
-      let vx = Math.cos(angle) * speed
-      let vy = Math.sin(angle) * speed
-      const size = .1 + Math.random() * .1
+      spark.rotation = Math.random() * Math.PI
+      const angle = Math.random() * Math.PI * 2
+      const reach = 16 + Math.random() * 30
+      const size = .1 + Math.random() * .12
+      const spin = (Math.random() - .5) * .08
       this.fxLayer.addChild(spark)
-      void this.tween(600 + Math.random() * 300, (t) => {
-        vy += .12
-        vx *= .97
-        spark.x += vx
-        spark.y += vy
-        spark.scale.set(size * (1 - t * .6))
-        spark.alpha = 1 - t
+      void this.tween(420 + Math.random() * 260, (t) => {
+        const r = reach * (1 - Math.pow(1 - t, 2))
+        spark.position.set(x + Math.cos(angle) * r, y + Math.sin(angle) * r * .9)
+        spark.scale.set(.015 + size * t)
+        spark.rotation += spin
+        spark.alpha = t < .25 ? 1 : 1 - (t - .25) / .75
       }).then(() => spark.destroy())
     }
   }
 
+  /** Idle gold mote rising slowly beside a settled 胡 (different direction from the landing spray). */
+  private idleMote(view: TileView) {
+    if (!view.visible || !view.parent) return
+    const origin = view.getGlobalPosition()
+    const local = this.fxLayer.toLocal(origin)
+    const mote = new Sprite(skin().star)
+    mote.anchor.set(.5)
+    mote.blendMode = 'add'
+    mote.tint = 0xffd34a
+    mote.position.set(local.x + 10 + Math.random() * (CELL_WIDTH - 20), local.y + CELL_HEIGHT * (.4 + Math.random() * .5))
+    const drift = (Math.random() - .5) * .3
+    const size = .05 + Math.random() * .06
+    this.fxLayer.addChild(mote)
+    void this.tween(900 + Math.random() * 500, (t) => {
+      mote.x += drift
+      mote.y -= .45
+      mote.scale.set(size * Math.sin(t * Math.PI))
+      mote.alpha = Math.sin(t * Math.PI)
+    }).then(() => mote.destroy())
+  }
+
   /**
-   * Near-miss reel (reference near miss01.mp4), all from the original effect sheets:
-   * the active reel is washed bright, tall orange light columns with star cores stand on both
-   * edges, yellow speed streaks race down the reel, and gold sparks spray left and right
-   * from the edges.
+   * Near-miss reel (reference near miss01.mp4): a broad yellow light column runs the full reel
+   * height on the left boundary (warm orange spill over the neighbouring reel), a thinner one on
+   * the right, gold glitter twinkles inside them, and faint white speed lines race down the reel.
    */
   private buildNearMiss() {
-    const [frame, streak, edge, starColumn] = skin().frames.nearmiss
-    const wash = new Graphics().rect(0, 0, CELL_WIDTH, BOARD_HEIGHT).fill('#fff4c8')
-    wash.blendMode = 'add'
-    wash.alpha = .08
-    const border = new Sprite(frame)
-    border.anchor.set(.5)
-    border.blendMode = 'add'
-    border.setSize(CELL_WIDTH + 10, BOARD_HEIGHT + 24)
-    border.position.set(CELL_WIDTH / 2, BOARD_HEIGHT / 2)
-    this.nearMissLayer.addChild(wash, border)
-    // Light columns sit on the reel boundaries, half over each neighbouring reel (reference),
-    // each with an orange flare, a star core and downward-racing speed streaks.
-    const band = CELL_WIDTH * .5
-    const streaks: Sprite[] = []
-    const columns = [-(PITCH_X - CELL_WIDTH) / 2, CELL_WIDTH + (PITCH_X - CELL_WIDTH) / 2].map((x) => {
+    const strip = (stops: [number, string][]) => {
+      const canvas = document.createElement('canvas')
+      canvas.width = 64
+      canvas.height = 4
+      const context = canvas.getContext('2d')!
+      const gradient = context.createLinearGradient(0, 0, 64, 0)
+      for (const [at, color] of stops) gradient.addColorStop(at, color)
+      context.fillStyle = gradient
+      context.fillRect(0, 0, 64, 4)
+      return Texture.from(canvas)
+    }
+    const glowTexture = strip([[0, 'rgba(255,170,40,0)'], [.25, 'rgba(255,200,60,.75)'], [.5, 'rgba(255,250,210,1)'], [.75, 'rgba(255,200,60,.75)'], [1, 'rgba(255,170,40,0)']])
+    const spillTexture = strip([[0, 'rgba(255,90,20,0)'], [.75, 'rgba(255,130,30,.8)'], [1, 'rgba(255,160,40,.2)']])
+    const gap = PITCH_X - CELL_WIDTH
+    const makeColumn = (x: number, width: number, spill: boolean) => {
       const column = new Container()
       column.x = x
-      const flare = new Sprite(skin().frames.nmflare[0])
-      flare.anchor.set(.5, 0)
-      flare.blendMode = 'add'
-      flare.setSize(band * .8, BOARD_HEIGHT)
-      const core = new Sprite(starColumn)
-      core.anchor.set(.5, 0)
-      core.blendMode = 'add'
-      core.setSize(band * .6, BOARD_HEIGHT)
-      const glow = new Sprite(edge)
-      glow.anchor.set(.5, 0)
-      glow.blendMode = 'add'
-      glow.setSize(16, BOARD_HEIGHT)
-      column.addChild(flare, core, glow)
-      for (let copy = 0; copy < 2; copy++) {
-        const lines = new Sprite(streak)
-        lines.anchor.set(.5, 0)
-        lines.blendMode = 'add'
-        lines.setSize(band, BOARD_HEIGHT)
-        streaks.push(lines)
-        column.addChild(lines)
+      if (spill) {
+        const warm = new Sprite(spillTexture)
+        warm.blendMode = 'add'
+        warm.setSize(CELL_WIDTH * .45, BOARD_HEIGHT)
+        warm.x = -CELL_WIDTH * .45 + 4
+        column.addChild(warm)
       }
+      const glow = new Sprite(glowTexture)
+      glow.blendMode = 'add'
+      glow.anchor.set(.5, 0)
+      glow.setSize(width, BOARD_HEIGHT)
+      const core = new Sprite(glowTexture)
+      core.blendMode = 'add'
+      core.anchor.set(.5, 0)
+      core.setSize(width * .45, BOARD_HEIGHT)
+      column.addChild(glow, core)
       this.nearMissLayer.addChild(column)
-      return column
-    })
-    // Gold sparks drift sideways out of the light columns, only a short way.
-    const sparks: { sprite: Sprite; vx: number; vy: number; life: number; age: number }[] = []
-    const sparkLayer = new Container()
-    this.nearMissLayer.addChild(sparkLayer)
-    let offset = 0
+      return { column, width }
+    }
+    const columns = [makeColumn(-gap / 2, 36, true), makeColumn(CELL_WIDTH + gap / 2, 16, false)]
+    // Faint white speed lines over the reel face, gold glitter inside the light columns.
+    const moteLayer = new Container()
+    this.nearMissLayer.addChild(moteLayer)
+    type Mote = { sprite: Container; vy: number; life: number; age: number; line: boolean }
+    const motes: Mote[] = []
     let last = performance.now()
     const tick = (now: number) => {
       const dt = Math.min(50, now - last)
       last = now
       if (this.nearMissLayer.visible) {
-        offset = (offset + dt * .9) % BOARD_HEIGHT
-        streaks.forEach((lines, index) => {
-          lines.y = (index % 2 ? offset : offset - BOARD_HEIGHT)
-          lines.alpha = .35 + Math.sin(now / 90) * .08
+        columns.forEach(({ column }, index) => {
+          column.alpha = .85 + Math.sin(now / 90 + index * 2) * .15
         })
-        const pulse = .85 + Math.sin(now / 110) * .15
-        border.alpha = pulse
-        columns.forEach((column, index) => {
-          column.alpha = pulse
-          column.scale.x = 1 + Math.sin(now / 75 + index) * .1
-        })
-        wash.alpha = .07 + Math.sin(now / 200) * .02
-        if (Math.random() < .7) {
-          const fromLeft = Math.random() < .5
-          const sprite = new Sprite(skin().star)
-          sprite.anchor.set(.5)
-          sprite.blendMode = 'add'
-          sprite.tint = Math.random() < .5 ? 0xffd34a : 0xff9a2a
-          sprite.position.set(columns[fromLeft ? 0 : 1].x, Math.random() * BOARD_HEIGHT)
-          sparkLayer.addChild(sprite)
-          const direction = Math.random() < .5 ? -1 : 1
-          sparks.push({ sprite, vx: direction * (.3 + Math.random() * .6), vy: (Math.random() - .5) * .5, life: 380 + Math.random() * 320, age: 0 })
+        if (Math.random() < .5) {
+          const length = 18 + Math.random() * 50
+          const line = new Graphics().rect(0, 0, 1.2, length).fill('#ffffff')
+          line.blendMode = 'add'
+          line.position.set(4 + Math.random() * (CELL_WIDTH - 8), -length + Math.random() * BOARD_HEIGHT * .6)
+          moteLayer.addChild(line)
+          motes.push({ sprite: line, vy: 1.4 + Math.random() * .8, life: 260 + Math.random() * 200, age: 0, line: true })
+        }
+        if (Math.random() < .6) {
+          const { column, width } = columns[Math.random() < .7 ? 0 : 1]
+          const dot = new Sprite(skin().star)
+          dot.anchor.set(.5)
+          dot.blendMode = 'add'
+          dot.tint = Math.random() < .5 ? 0xffe27a : 0xffffff
+          dot.position.set(column.x + (Math.random() - .5) * width * .8, Math.random() * BOARD_HEIGHT)
+          moteLayer.addChild(dot)
+          motes.push({ sprite: dot, vy: .15 + Math.random() * .2, life: 300 + Math.random() * 300, age: 0, line: false })
         }
       }
-      for (let index = sparks.length - 1; index >= 0; index--) {
-        const spark = sparks[index]
-        spark.age += dt
-        spark.sprite.x += spark.vx
-        spark.sprite.y += spark.vy
-        const t = spark.age / spark.life
-        spark.sprite.scale.set(.07 * (1 - t) + .015)
-        spark.sprite.alpha = 1 - t
+      for (let index = motes.length - 1; index >= 0; index--) {
+        const mote = motes[index]
+        mote.age += dt
+        mote.sprite.y += mote.vy * dt
+        const t = mote.age / mote.life
+        const wave = Math.sin(Math.min(1, t) * Math.PI)
+        if (mote.line) mote.sprite.alpha = .35 * wave
+        else {
+          mote.sprite.alpha = wave
+          mote.sprite.scale.set(.05 * wave + .005)
+        }
         if (t >= 1 || !this.nearMissLayer.visible) {
-          spark.sprite.destroy()
-          sparks.splice(index, 1)
+          mote.sprite.destroy()
+          motes.splice(index, 1)
         }
       }
       requestAnimationFrame(tick)
@@ -662,33 +686,42 @@ export class ReelGrid extends Container {
   }
 
   private highlightWinners(wins: Set<string>, callbacks: ReelSpinCallbacks) {
-    const stagger = callbacks.turbo ? 45 : 110
+    const stagger = callbacks.turbo ? 70 : 170
     const hold = callbacks.turbo ? 380 : 900
     const lastCol = Math.max(...[...wins].map((key) => Number(key.split(':')[1])))
     const duration = lastCol * stagger + hold
     const lit = new Set<number>()
+    const cells = [...wins].map((key) => key.split(':').map(Number) as [number, number])
     this.dim.visible = true
+    // Winners are lifted above the dim straight away (they stay white); the gold light follows.
+    for (const [row, col] of cells) {
+      const view = this.views[col][row + 1]
+      if (view.parent !== this.reelLayer) this.reelLayer.addChild(view)
+    }
     return this.tween(duration, (_t, elapsed) => {
       this.dim.alpha = Math.max(.01, .55 * Math.min(1, elapsed / 120))
-      for (const key of wins) {
-        const [row, col] = key.split(':').map(Number)
+      for (const [row, col] of cells) {
         const since = elapsed - col * stagger
-        if (since < 0) continue
+        const view = this.views[col][row + 1]
+        if (since < 0) {
+          view.frame.visible = false
+          view.glow.visible = false
+          continue
+        }
         if (!lit.has(col)) {
           lit.add(col)
           callbacks.sound('highlight', col)
         }
-        const view = this.views[col][row + 1]
-        // The highlight stays in place: only the gold outline and face glow pulse.
-        const fadeIn = Math.min(1, since / 80)
+        const fadeIn = Math.min(1, since / 60)
+        const flash = Math.max(0, 1 - since / 240)
         view.frame.visible = true
         view.frame.alpha = (.8 + Math.sin(since / 90) * .2) * fadeIn
         view.glow.visible = view.tile.visible
-        view.glow.alpha = (.35 + Math.sin(since / 90) * .12) * fadeIn
-        // Lift highlighted tiles above the dim overlay.
-        if (view.parent !== this.reelLayer) this.reelLayer.addChild(view)
+        view.glow.alpha = (.32 + Math.sin(since / 90) * .12 + .5 * flash) * fadeIn
+        this.place(col, row + 1, this.rowY(row), 1 + .06 * flash)
       }
     }).then(() => {
+      for (const [row, col] of cells) this.place(col, row + 1, this.rowY(row))
       for (const column of this.views) for (const view of column) {
         view.tint = 0xffffff
         view.frame.visible = false
@@ -725,7 +758,6 @@ export class ReelGrid extends Container {
       const fireBurst = !burstFired && t >= .5
       if (fireBurst) burstFired = true
       for (const [row, col] of winners) {
-        if (kept.has(`${row}:${col}`)) continue
         const view = this.views[col][row + 1]
         if (frameChanged && t < .6) {
           view.tile.texture = turnFrames[frame]
@@ -739,9 +771,7 @@ export class ReelGrid extends Container {
         view.alpha = t < .6 ? 1 : Math.max(0, 1 - (t - .6) / .25)
       }
     })
-    for (const [row, col] of winners) {
-      if (!kept.has(`${row}:${col}`)) this.views[col][row + 1].visible = false
-    }
+    for (const [row, col] of winners) this.views[col][row + 1].visible = false
     return kept
   }
 
@@ -756,20 +786,31 @@ export class ReelGrid extends Container {
     }
     if (!targets.length) return
     callbacks.sound('wild')
-    let swapped = false
-    await this.tween(callbacks.turbo ? 220 : 420, (t) => {
-      const crossing = !swapped && t >= .5
-      if (crossing) swapped = true
-      for (const [col, slot] of targets) {
-        if (crossing) {
-          this.states[col][slot] = { symbol: 'wild', gold: false }
-          this.paint(col, slot)
-          this.playBurst(this.baseX(col) + CELL_WIDTH / 2, this.slotY(slot) + CELL_HEIGHT / 2, 150)
-        }
-        this.place(col, slot, this.slotY(slot), Math.max(.02, Math.abs(Math.cos(t * Math.PI))))
-      }
+    // Normal games and win.mp4 4.0–4.3 s: the WILD fades in where the gold tile was cleared,
+    // inside a gold glow — no flip or squash.
+    const glows = targets.map(([col, slot]) => {
+      this.states[col][slot] = { symbol: 'wild', gold: false }
+      this.paint(col, slot)
+      const view = this.views[col][slot]
+      view.visible = true
+      view.alpha = .01
+      this.place(col, slot, this.slotY(slot))
+      const glow = new Sprite(softGlowTexture())
+      glow.anchor.set(.5)
+      glow.blendMode = 'add'
+      glow.tint = 0xffd34a
+      glow.position.set(this.baseX(col) + CELL_WIDTH / 2, this.slotY(slot) + CELL_HEIGHT / 2)
+      glow.setSize(CELL_WIDTH * 1.4, CELL_HEIGHT * 1.3)
+      this.fxLayer.addChild(glow)
+      this.playBurst(glow.x, glow.y, 120)
+      return glow
     })
-    for (const [col, slot] of targets) this.place(col, slot, this.slotY(slot))
+    await this.tween(callbacks.turbo ? 200 : 380, (t) => {
+      for (const [col, slot] of targets) this.views[col][slot].alpha = Math.max(.01, t)
+      glows.forEach((glow) => { glow.alpha = Math.max(.01, Math.sin(t * Math.PI)) })
+    })
+    glows.forEach((glow) => glow.destroy())
+    for (const [col, slot] of targets) this.views[col][slot].alpha = 1
   }
 
   private async refill(wins: Set<string>, converted: Set<string>, callbacks: ReelSpinCallbacks) {
@@ -859,8 +900,10 @@ export class ReelGrid extends Container {
         view.rays.rotation = now / 2600
         view.rays.alpha = .25 + Math.sin(now / 420) * .08
         view.flame.alpha = .75 + Math.sin(now / 160) * .05
-        view.halo.alpha = .35 + Math.sin(now / 300) * .08
+        view.halo.alpha = .5 + Math.sin(now / 300) * .08
         view.medal.alpha = .95 + Math.sin(now / 380) * .05
+        // Idle: a few gold motes drift up around every visible 胡 (reference, after landing).
+        if (Math.random() < .05) this.idleMote(view)
       }
       requestAnimationFrame(tick)
     }

@@ -234,7 +234,7 @@ def main():
         for x in range(medal.width):
             r, g, b, a = px[x, y]
             k = max(r, g, b) / 255 * 0.35 + min(r, g, b) / 255 * 0.65
-            px[x, y] = (255, round(176 + 74 * k), round(36 + 170 * k), a)
+            px[x, y] = (255, round(178 + 62 * k), round(30 + 100 * k), a)
     medal.save(OUT / 'hufx_3.png')
     zh_out = OUT / 'zh'
     zh_out.mkdir(exist_ok=True)
