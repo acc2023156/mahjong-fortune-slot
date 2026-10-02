@@ -1,4 +1,5 @@
 import { ASSET_VERSION } from './assetVersion'
+console.info(`[MJW] build ${ASSET_VERSION}`)
 
 /** Must match MEDIA_CACHE in public/sw.js. */
 const MEDIA_CACHE = `mjw-media-${ASSET_VERSION}`

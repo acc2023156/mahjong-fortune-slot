@@ -438,28 +438,6 @@ export class ReelGrid extends Container {
     }
   }
 
-  /** Idle gold mote rising slowly beside a settled 胡 (different direction from the landing spray). */
-  private idleMote(view: TileView) {
-    if (!view.visible || !view.parent) return
-    const origin = view.getGlobalPosition()
-    const local = this.fxLayer.toLocal(origin)
-    const mote = new Sprite(skin().star)
-    mote.anchor.set(.5)
-    mote.blendMode = 'add'
-    mote.tint = 0xffd34a
-    mote.position.set(local.x + 10 + Math.random() * (CELL_WIDTH - 20), local.y + CELL_HEIGHT * (.4 + Math.random() * .5))
-    const drift = (Math.random() - .5) * .3
-    const size = .05 + Math.random() * .06
-    this.fxLayer.addChild(mote)
-    void this.tween(900 + Math.random() * 500, (t) => {
-      mote.x += drift
-      mote.y -= .45
-      mote.scale.set(size * Math.sin(t * Math.PI))
-      mote.alpha = Math.sin(t * Math.PI)
-    }).then(() => mote.destroy())
-  }
-
-
   /**
    * Near-miss reel (reference near miss01.mp4), all from the original effect sheets:
    * the active reel is washed bright, tall orange light columns with star cores stand on both
@@ -883,8 +861,6 @@ export class ReelGrid extends Container {
         view.flame.alpha = .75 + Math.sin(now / 160) * .05
         view.halo.alpha = .35 + Math.sin(now / 300) * .08
         view.medal.alpha = .95 + Math.sin(now / 380) * .05
-        // Idle: a few gold motes drift up around every visible 胡 (reference, after landing).
-        if (Math.random() < .05) this.idleMote(view)
       }
       requestAnimationFrame(tick)
     }
