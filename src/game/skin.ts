@@ -23,7 +23,7 @@ const SKIN_NAMES = [...CORE_NAMES, ...DEFERRED_NAMES] as const
 const DIGIT_KEYS = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'x', 'dot'] as const
 
 /** Effect frame sequences from the reference atlases, in playback order. */
-const SEQUENCE_LENGTHS = { turn: 6, burst: 9, coinspin: 8, tilefx: 8, hl: 3, hufx: 4, nearmiss: 5, nmflare: 1 } as const
+const SEQUENCE_LENGTHS = { turn: 6, burst: 9, coinspin: 8, tilefx: 8, hl: 3, hufx: 4, nearmiss: 5, nmflare: 1, goldturn: 7 } as const
 /** Feature-screen (Big Win / Free Spins / Total Win) art from the reference sheets; streamed after start-up. */
 const DEFERRED_SEQUENCE_LENGTHS = {
   bwpile: 3, bwlight: 3, rays: 1, fsui: 2, flycoin: 10, fsbg: 1, fsglow: 1, fsgold: 2,

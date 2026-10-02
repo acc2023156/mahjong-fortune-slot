@@ -112,6 +112,11 @@ SEQUENCES = [
     # Tile turning from face-on to its teal side (used when winners clear).
     ('turn', FX_A + '919329ec-d941-4cb0-a29e-b057e7622ce6.e5924.png',
      [(339, 1, 158, 188), (173, 196, 161, 189), (3, 195, 167, 188), (3, 3, 169, 188), (175, 1, 159, 190), (338, 193, 130, 188)], False),
+    # Winning gold tile → WILD ingot: gold tile turning to its glowing edge, a glow blob, then the
+    # glowing ingot settling (alpha atlas; frames picked in playback order).
+    ('goldturn', FX_A + 'ab27c5db-5c23-4f40-b333-421b9fe6e3f8.7d7fc.png',
+     [(26, 27, 157, 170), (11, 235, 141, 225), (220, 8, 138, 204), (6, 483, 141, 199), (372, 8, 211, 128),
+      (374, 153, 196, 122), (592, 350, 154, 111)], False),
     # Gold starburst, bright flash to fade.
     ('burst', FX_A + '503f7462-bb14-4e80-9d50-57622be05c21.19bc2.png',
      [(700, 697, 134, 149), (513, 687, 170, 168), (509, 475, 190, 195), (513, 246, 208, 210), (508, 12, 215, 216),

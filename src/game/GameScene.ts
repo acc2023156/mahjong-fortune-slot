@@ -53,9 +53,30 @@ class WinPlaque extends Container {
   setMaxed(on: boolean) {
     if (on === this.maxed) return
     this.maxed = on
-    this.frame.visible = !on
-    this.maxFrame.visible = on
-    if (!on) return
+    if (!on) {
+      // Back to normal: the jade frame plays its pop in reverse and hands over to the red frame.
+      const base = this.maxFrame.scale.x
+      this.frame.visible = true
+      this.frame.alpha = .01
+      const start = performance.now()
+      const tick = () => {
+        if (this.maxed) { this.frame.alpha = 1; return }
+        const t = Math.min(1, (performance.now() - start) / 350)
+        this.maxFrame.scale.set(base * (1 + .12 * Math.sin(t * Math.PI)))
+        this.maxFrame.alpha = Math.max(.01, 1 - t)
+        this.frame.alpha = Math.max(.01, t)
+        if (t < 1) { requestAnimationFrame(tick); return }
+        this.maxFrame.visible = false
+        this.maxFrame.alpha = 1
+        this.maxFrame.scale.set(base)
+        this.frame.alpha = 1
+      }
+      requestAnimationFrame(tick)
+      return
+    }
+    this.frame.visible = false
+    this.maxFrame.visible = true
+    this.maxFrame.alpha = 1
     const base = this.maxFrame.scale.x
     const sweep = new Sprite(softGlowTexture())
     sweep.anchor.set(.5)

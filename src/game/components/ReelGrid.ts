@@ -77,6 +77,8 @@ export class ReelGrid extends Container {
   private readonly motes = new Set<Sprite>()
   private motesPaused = false
   private entrances: Promise<void>[] = []
+  /** Gold glow that stays on a winning gold tile from its turn until the WILD has appeared. */
+  private readonly goldHalos = new Map<CellState, Sprite>()
   private readonly nearMissLayer = new Container()
   private running = false
   private quickStopRequested = false
@@ -301,6 +303,24 @@ export class ReelGrid extends Container {
       }
     }
     let nearMissCol = -1
+    // Near-miss reels never swap symbols in view: the result tiles are fed in as they wrap behind
+    // the top edge during the last strip cycle, and the reel eases to a stop without a bounce.
+    type StopPlan = { start: number; from: number; to: number; t1: number; T: number; v: number; m: number; target: CellState[] }
+    const plans: (StopPlan | undefined)[] = []
+    const targetColumn = (col: number) => Array.from({ length: SLOTS }, (_, slot) => slot === 0
+      ? this.pendingPeeks?.above[col] ?? this.strips.blur(col)
+      : slot === SLOTS - 1 ? this.pendingPeeks?.below[col] ?? this.strips.blur(col)
+        : outcome[slot - 1][col])
+    const planStop = (col: number, now: number) => {
+      const v = NEAR_MISS_SPEED
+      const T = 900
+      const from = offsets[col]
+      const duration = Math.max(T + 600, stopTimes[col] - (now - start))
+      const natural = v * (duration - T) + v * T / 2
+      const to = Math.max(Math.round((from + natural) / PITCH_Y), Math.ceil((from + STRIP_HEIGHT + v * T) / PITCH_Y)) * PITCH_Y
+      const steps = Math.round(to / PITCH_Y)
+      plans[col] = { start: now, from, to, t1: (to - from - v * T / 2) / v, T, v, m: ((steps % SLOTS) + SLOTS) % SLOTS, target: targetColumn(col) }
+    }
     const phases = Array.from({ length: REEL_COLUMNS }, () => 0) // 0 spinning, 1 settling, 2 stopped
     const settleStarts = Array.from({ length: REEL_COLUMNS }, () => 0)
     const offsets = Array.from({ length: REEL_COLUMNS }, () => 0)
@@ -326,6 +346,19 @@ export class ReelGrid extends Container {
       }
     }
 
+    const columnStopped = (col: number) => {
+      callbacks.sound('reelStop', col)
+      this.celebrateScatters(col, callbacks)
+      const next = col + 1
+      if (!this.quickStopRequested && firstNearMiss > 0 && next >= firstNearMiss && next < REEL_COLUMNS) {
+        if (nearMissCol < 0) callbacks.anticipation(true)
+        nearMissCol = next
+        this.showNearMiss(next)
+        callbacks.sound('nearMiss', next)
+        planStop(next, performance.now())
+      }
+    }
+
     const animate = () => {
       const now = performance.now()
       const elapsed = now - start
@@ -333,6 +366,36 @@ export class ReelGrid extends Container {
       lastFrame = now
       const forceStop = this.quickStopRequested
       for (let col = 0; col < REEL_COLUMNS; col++) {
+        const plan = forceStop ? undefined : plans[col]
+        if (plan && phases[col] === 0) {
+          const local = now - plan.start
+          const decel = Math.min(1, Math.max(0, (local - plan.t1) / plan.T))
+          const offset = local < plan.t1
+            ? plan.from + plan.v * local
+            : plan.from + plan.v * plan.t1 + plan.v * plan.T / 2 * (1 - Math.pow(1 - decel, 2))
+          offsets[col] = offset
+          for (let slot = 0; slot < SLOTS; slot++) {
+            const y = STRIP_TOP + (this.slotY(slot) - STRIP_TOP + offset) % STRIP_HEIGHT
+            if (y < lastY[col][slot]) {
+              const lastCycle = plan.to - offset <= STRIP_HEIGHT
+              this.states[col][slot] = lastCycle ? plan.target[(slot + plan.m) % SLOTS] : this.strips.blur(col)
+              this.paint(col, slot)
+            }
+            lastY[col][slot] = y
+            this.place(col, slot, y)
+          }
+          if (decel >= 1) {
+            // Re-index so views[col][slot] sits at slotY(slot) again — the picture does not change.
+            for (let slot = 0; slot < SLOTS; slot++) {
+              this.states[col][slot] = plan.target[slot]
+              this.paint(col, slot)
+              this.place(col, slot, this.slotY(slot))
+            }
+            phases[col] = 2
+            columnStopped(col)
+          }
+          continue
+        }
         if (phases[col] === 0 && (forceStop || elapsed >= stopTimes[col])) settleColumn(col)
         if (phases[col] === 0) {
           const acceleration = Math.min(1, elapsed / (callbacks.turbo ? 70 : 150))
@@ -362,15 +425,7 @@ export class ReelGrid extends Container {
           if (progress >= 1) {
             phases[col] = 2
             for (let slot = 0; slot < SLOTS; slot++) this.place(col, slot, this.slotY(slot))
-            callbacks.sound('reelStop', col)
-            this.celebrateScatters(col, callbacks)
-            const next = col + 1
-            if (!forceStop && firstNearMiss > 0 && next >= firstNearMiss && next < REEL_COLUMNS) {
-              if (nearMissCol < 0) callbacks.anticipation(true)
-              nearMissCol = next
-              this.showNearMiss(next)
-              callbacks.sound('nearMiss', next)
-            }
+            columnStopped(col)
           }
         }
       }
@@ -796,7 +851,21 @@ export class ReelGrid extends Container {
     callbacks.sound('flip')
     // Every winner — gold included — bursts coins and starts turning at the same moment.
     for (const [row, col] of winners) {
-      this.coinBurst(this.baseX(col) + CELL_WIDTH / 2, this.rowY(row) + CELL_HEIGHT / 2, callbacks.turbo)
+      const x = this.baseX(col) + CELL_WIDTH / 2
+      const y = this.rowY(row) + CELL_HEIGHT / 2
+      this.coinBurst(x, y, callbacks.turbo)
+      if (kept.has(`${row}:${col}`)) {
+        const halo = new Sprite(softGlowTexture())
+        halo.anchor.set(.5)
+        halo.blendMode = 'add'
+        halo.tint = 0xffc83a
+        halo.position.set(x, y)
+        halo.setSize(CELL_WIDTH * 1.35, CELL_HEIGHT * 1.25)
+        halo.alpha = .01
+        this.fxLayer.addChild(halo)
+        this.goldHalos.set(this.rowState(row, col), halo)
+        void this.tween(duration * .6, (t) => { if (!halo.destroyed) halo.alpha = Math.max(.01, .85 * t) })
+      }
     }
     const turnFrames = skin().frames.turn
     let lastFrame = -1
@@ -808,19 +877,26 @@ export class ReelGrid extends Container {
       for (const [row, col] of winners) {
         const view = this.views[col][row + 1]
         const gold = kept.has(`${row}:${col}`)
+        if (gold) {
+          // Original gold-tile frames: the gold tile turns to its glowing edge.
+          if (frameChanged && t < .6) {
+            const goldFrames = skin().frames.goldturn
+            const index = Math.min(2, Math.floor(t / .6 * 3))
+            view.tile.texture = goldFrames[index]
+            view.tile.scale.set(CELL_HEIGHT * 1.02 / goldFrames[0].height)
+            view.glyph.visible = index === 0
+            view.glyph.scale.x = view.glyph.scale.y * (1 - index * .3)
+          }
+          view.alpha = t < .6 ? 1 : Math.max(.01, 1 - (t - .6) / .4)
+          continue
+        }
         if (frameChanged && t < .6) {
           view.tile.texture = turnFrames[frame]
           view.tile.scale.set(ART_SCALE)
-          // The gold tile turns as a gold tile, wrapped in its glow.
-          view.tile.tint = gold ? 0xffd25a : 0xffffff
           // Keep the face glyph on the shrinking front face for the first frames, then hide it.
           view.glyph.visible = frame < 3
           view.glyph.scale.x = view.glyph.scale.y * (1 - frame * .14)
           view.glyph.x = CELL_WIDTH / 2 + frame * 3
-        }
-        if (gold) {
-          view.glow.visible = true
-          view.glow.alpha = .5 + .4 * Math.min(1, t / .5)
         }
         view.alpha = t < .6 ? 1 : Math.max(0, 1 - (t - .6) / .25)
       }
@@ -828,7 +904,6 @@ export class ReelGrid extends Container {
     for (const [row, col] of winners) {
       const view = this.views[col][row + 1]
       view.visible = false
-      view.tile.tint = 0xffffff
       view.glow.visible = false
     }
     return kept
@@ -847,52 +922,68 @@ export class ReelGrid extends Container {
     if (!targets.length) return
     callbacks.sound('wild')
     const speed = callbacks.turbo ? .6 : 1
+    const goldFrames = skin().frames.goldturn
     const cells = targets.map(([col, slot]) => {
       const x = this.baseX(col) + CELL_WIDTH / 2
       const y = this.slotY(slot) + CELL_HEIGHT / 2
+      const halo = this.goldHalos.get(this.states[col][slot])
+      this.goldHalos.delete(this.states[col][slot])
       // 1. Short full-cell gold flash.
       const fill = new Graphics().roundRect(-CELL_WIDTH / 2, -CELL_HEIGHT / 2, CELL_WIDTH, CELL_HEIGHT, 8).fill('#ffd84a')
       fill.blendMode = 'add'
       fill.position.set(x, y)
-      fill.alpha = .9
-      this.fxLayer.addChild(fill)
-      return { col, slot, x, y, fill }
+      fill.alpha = .85
+      // 2. The original glow blob → glowing ingot frames, sized to land on the WILD's ingot.
+      const morph = new Sprite(goldFrames[3])
+      morph.anchor.set(.5)
+      morph.blendMode = 'add'
+      morph.position.set(x, y + CELL_HEIGHT * .12)
+      this.fxLayer.addChild(fill, morph)
+      return { col, slot, x, y, fill, morph, halo }
     })
-    await this.tween(70 * speed, (t) => { cells.forEach(({ fill }) => { fill.alpha = Math.max(.01, .9 * (1 - t * .6)) }) })
-    // 2. Light burst; 3. WILD + ingot come out of a blur.
-    const blur = new BlurFilter({ strength: 8, quality: 2 })
-    const glows = cells.map(({ col, slot, x, y }) => {
-      this.playBurst(x, y, 130)
-      this.states[col][slot] = { symbol: 'wild', gold: false }
-      this.paint(col, slot)
-      const view = this.views[col][slot]
-      view.visible = true
-      view.alpha = .3
-      view.filters = [blur]
-      this.place(col, slot, this.slotY(slot))
-      const glow = new Sprite(softGlowTexture())
-      glow.anchor.set(.5)
-      glow.blendMode = 'add'
-      glow.tint = 0xffd34a
-      glow.position.set(x, y + CELL_HEIGHT * .18)
-      glow.setSize(CELL_WIDTH * 1.1, CELL_HEIGHT * .8)
-      this.fxLayer.addChild(glow)
-      return glow
+    const blur = new BlurFilter({ strength: 7, quality: 2 })
+    let revealed = false
+    await this.tween(260 * speed, (t) => {
+      cells.forEach(({ fill, morph }) => {
+        fill.alpha = Math.max(.01, .85 * (1 - t / .3))
+        const index = t < .35 ? 3 : t < .65 ? 4 : 5
+        morph.texture = goldFrames[index]
+        const width = index === 3 ? CELL_WIDTH * .7 : CELL_WIDTH * (.95 - .2 * (t - .35) / .65)
+        morph.scale.set(width / morph.texture.width)
+        morph.alpha = t < .1 ? t / .1 : t < .7 ? 1 : Math.max(.01, 1 - (t - .7) / .3)
+      })
+      // 3. WILD + ingot come out of a blur behind the glowing ingot.
+      if (!revealed && t >= .35) {
+        revealed = true
+        for (const { col, slot, x, y } of cells) {
+          this.playBurst(x, y, 120)
+          this.states[col][slot] = { symbol: 'wild', gold: false }
+          this.paint(col, slot)
+          const view = this.views[col][slot]
+          view.visible = true
+          view.alpha = .2
+          view.filters = [blur]
+          this.place(col, slot, this.slotY(slot))
+        }
+      }
+      if (revealed) {
+        const k = Math.min(1, (t - .35) / .5)
+        blur.strength = 7 * (1 - k)
+        for (const { col, slot } of cells) this.views[col][slot].alpha = .2 + .8 * k
+      }
     })
-    await this.tween(110 * speed, (t) => {
-      cells.forEach(({ fill }) => { fill.alpha = Math.max(.01, .36 * (1 - t)) })
-      blur.strength = 8 * (1 - t)
-      for (const { col, slot } of cells) this.views[col][slot].alpha = .3 + .7 * t
-    })
-    cells.forEach(({ col, slot, fill }) => {
+    cells.forEach(({ col, slot, fill, morph, halo }) => {
       fill.destroy()
+      morph.destroy()
       const view = this.views[col][slot]
       view.filters = []
       view.alpha = 1
+      // 4. The ingot keeps its glow a moment, then the WILD is static.
+      if (halo && !halo.destroyed) {
+        const from = halo.alpha
+        void this.tween(420 * speed, (t) => { halo.alpha = Math.max(.01, from * (1 - t)) }).then(() => halo.destroy())
+      }
     })
-    // 4. The ingot's glow fades out on its own while the cascade continues.
-    void this.tween(420 * speed, (t) => { glows.forEach((glow) => { glow.alpha = Math.max(.01, 1 - t) }) })
-      .then(() => glows.forEach((glow) => glow.destroy()))
   }
 
   private async refill(wins: Set<string>, converted: Set<string>, callbacks: ReelSpinCallbacks) {
@@ -1029,7 +1120,8 @@ export class ReelGrid extends Container {
       coin.animationSpeed = .35 + Math.random() * .2
       coin.gotoAndPlay(Math.floor(Math.random() * coinFrames.length))
       const angle = Math.random() * Math.PI * 2
-      const reach = CELL_WIDTH * (.6 + Math.random() * .6)
+      // Reference: coins only fly to the borders with the neighbouring tiles (~10% past the edge).
+      const reach = CELL_WIDTH * (.4 + Math.random() * .2)
       coin.position.set(x, y)
       coin.rotation = angle + Math.PI / 2
       this.fxLayer.addChild(coin)
@@ -1048,7 +1140,7 @@ export class ReelGrid extends Container {
       dot.tint = [0xffd21f, 0xffb81a, 0xffe45c][index % 3]
       const size = 3 + Math.random() * 5
       const angle = Math.random() * Math.PI * 2
-      const reach = CELL_WIDTH * (.4 + Math.random() * .9)
+      const reach = CELL_WIDTH * (.25 + Math.random() * .35)
       dot.position.set(x, y)
       dot.rotation = angle
       this.fxLayer.addChild(dot)
